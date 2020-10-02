@@ -3,23 +3,28 @@
 
 ### Dependecies
 
-
-Our code was tested on Ubunto ### and ### 
 * numpy
-* pandas
-* python 3.5+
+* python 3.8+
 * pytorch ###
 * tqdm
+* pillow
+* scikit-learn
+* gpytorch
+
+
+Our code was tested on Ubuntu 16.04.7 LTS, Cuda release 10.1, V10.1.243
 
 
 To set up the specific conda environment run:
 ```
-conda create --name imb_fsl --python 3.5
-conda install 
-
+conda create -n ifsl python=3.8
+conda activate ifsl
+conda install pytorch torchvision -c pytorch
+conda install -c conda-forge tqdm
+conda install -c anaconda pillow
+conda install -c anaconda scikit-learn
+conda install -c conda-forge gpytorch
 ```
-
-Code was tested on 
 
 
 ### Datasets

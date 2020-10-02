@@ -1,6 +1,4 @@
 from models.model_template import ModelTemplate
-import utils.utils as utils
-
 import torch
 import torch.nn as nn
 from torch.autograd import Variable

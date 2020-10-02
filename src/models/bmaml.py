@@ -4,7 +4,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-import utils.utils as utils
 from models.model_template import ModelTemplate
 
 BayesianMAMLModelState = namedtuple("BayesianMAMLModelState", ["X", "y"])

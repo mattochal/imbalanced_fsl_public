@@ -4,8 +4,6 @@ import argparse
 import numpy as np
 import torch
 from torchvision import transforms
-from imgaug import augmenters as iaa
-import imgaug as ia
 
 
 class ROS_AUG(StrategyTemplate):  # random oversampling with augmentation

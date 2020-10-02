@@ -4,7 +4,6 @@ import time
 import json
 import torch
 import numpy as np
-import scipy.stats as st
 import random
 import argparse
 import sys

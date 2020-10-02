@@ -1,5 +1,5 @@
 from models.model_template import ModelTemplate
-import utils.utils as utils
+import utils.utils as uu
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -89,7 +89,7 @@ class GPShot(ModelTemplate):
             
             all_h = self.forward(all_x)
             all_h, all_y = self.strategy.update_support_features((all_h, all_y))
-            all_y_onehots = utils.onehot(all_y, fill_with=-1, dim=self.output_dim[self.mode]).split(1,1)
+            all_y_onehots = uu.onehot(all_y, fill_with=-1, dim=self.output_dim[self.mode]).split(1,1)
             
             self.optimizer.zero_grad()
             
@@ -149,14 +149,14 @@ class GPShot(ModelTemplate):
         support_h = self.forward(support_x).detach()
         support_h, support_y = self.strategy.update_support_features((support_h, support_y))
         
-        self.support_y_onehots = utils.onehot(support_y, fill_with=-1, dim=self.output_dim[self.mode]).split(1,1)
+        self.support_y_onehots = uu.onehot(support_y, fill_with=-1, dim=self.output_dim[self.mode]).split(1,1)
         self.support_h = support_h
     
     def net_eval(self, target_set, ptracker):
         if len(target_set[0]) == 0: return torch.tensor(0.).to(self.device)
         
         target_x, target_y = target_set
-        target_y_onehots = utils.onehot(target_y, fill_with=-1, dim=self.output_dim[self.mode]).split(1,1)
+        target_y_onehots = onehot(target_y, fill_with=-1, dim=self.output_dim[self.mode]).split(1,1)
         
         with torch.no_grad():
             self.gpmodel.eval()

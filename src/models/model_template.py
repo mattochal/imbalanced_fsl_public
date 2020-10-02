@@ -1,7 +1,6 @@
 import torch.nn as nn
 import torch
 import time
-import utils.utils as utils
 import sys
 import argparse
 

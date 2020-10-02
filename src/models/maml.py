@@ -5,7 +5,6 @@ import numpy as np
 import torch.nn.functional as F
 from models.model_template import ModelTemplate
 import models.backbones as backbones
-import utils.utils as utils
 import copy
 import argparse
 
@@ -21,7 +20,7 @@ class Maml(ModelTemplate):
         parser = ModelTemplate.get_parser(parser)
         parser.add_argument('--num_inner_loop_steps', type=int, default=5)
         parser.add_argument('--inner_loop_lr', type=float, default=0.01)
-        parser.add_argument('--approx', type=utils.str2bool, default=True)
+        parser.add_argument('--approx', type=bool, default=True)
         parser.add_argument('--batch_size', type=int, default=4,
                            help='number of tasks before the outerloop update, eg. update meta learner every 4th task')
         parser.add_argument('--output_dim', type=dict, default={"train":-1, "val":-1, "test":-1},

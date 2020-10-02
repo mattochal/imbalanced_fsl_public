@@ -4,8 +4,6 @@ from PIL import Image
 import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
-from imgaug import augmenters as iaa
-import imgaug as ia
 import fnmatch
 import os
 import tqdm
@@ -19,8 +17,6 @@ from PIL import Image, ImageEnhance
 import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
-from imgaug import augmenters as iaa
-import imgaug as ia
 from typing import Sequence
 
 from tasks.imbalance_utils import get_num_samples_per_class

@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 import pprint
 from torch.autograd import Variable
-import utils.utils as utils
+import utils.utils as uu
 import numpy as np
 import argparse
 
@@ -66,7 +66,7 @@ class RelationNet(ProtoNet):
         scores = scores.view(-1, n_way)
         
         if self.loss_type == 'mse':
-            targets_y_onehot = Variable(utils.onehot(targets_y).float().to(self.device))
+            targets_y_onehot = Variable(uu.onehot(targets_y).float().to(self.device))
             loss = self.loss_fn(scores, targets_y_onehot)
         else:
             loss = self.strategy.apply_outer_loss(self.loss_fn, scores, targets_y)
