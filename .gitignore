@@ -3,3 +3,4 @@ data/mini/
 data/cub/
 __pycache__/
 *.py[cod]
+*.ipynb_checkpoints*
