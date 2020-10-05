@@ -4,3 +4,5 @@ data/cub/
 __pycache__/
 *.py[cod]
 *.ipynb_checkpoints*
+zip_code.sh
+code.zip
