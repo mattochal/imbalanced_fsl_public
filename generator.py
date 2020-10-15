@@ -596,11 +596,11 @@ if __name__ == '__main__':
     ]
     
     strategies = [
-#         None,
+        None,
 #         'ros',
 #         'ros_aug',
-        'focal_loss',    # -- left for anyone to try 
-        'weighted_loss'  # -- left for anyone to try 
+#         'focal_loss',    # -- left for anyone to try 
+#         'weighted_loss'  # -- left for anyone to try 
     ]
     
     seeds = [
@@ -610,8 +610,13 @@ if __name__ == '__main__':
     ]
     
     balanced_task = (5, 5, None, 'balanced')
-    imbalanced_task = (1, 9, None, 'random')
-#     imbalanced_tasks = [(1, 9, None, 'linear'), (1, 9, None, 'linear')]
+#     imbalanced_task = (1, 9, None, 'random')
+    imbalanced_tasks = [
+        (1, 9, None, 'linear'), 
+        (3, 7, None, 'linear'), 
+        (1, 9, 0.2, 'step'),
+        (1, 9, 0.8, 'step')
+    ]
     
     if args.minimal:
         models = models[:2]
@@ -620,10 +625,10 @@ if __name__ == '__main__':
         
     if args.imbalanced_task:
         # Standard meta-training
-        standard_expfiles = fsl(args, models=models, strategies=[None], seeds=seeds, train_tasks=[balanced_task], 
+        standard_expfiles = fsl(args, models=models, strategies=[None], seeds=seeds, train_tasks=[],
                                 save=not (args.test or args.inference), expfolder='imbalanced_task/')
         # Random Shot meta-training
-        randomshot_expfiles = fsl(args, models=models, strategies=strategies, seeds=seeds, train_tasks=[imbalanced_task], 
+        randomshot_expfiles = fsl(args, models=models, strategies=strategies, seeds=seeds, train_tasks=imbalanced_tasks, 
                                   save=not (args.test or args.inference), expfolder='imbalanced_task/')
         
         if args.test: 
