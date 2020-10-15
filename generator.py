@@ -285,7 +285,7 @@ def fsl(args, models=[], strategies=[], seeds=[], train_tasks=[], var_update={},
                         'dataset_args.train.aug'     : [True],
                         'ptracker_args.test.metrics' : [['accuracy', 'loss', 'per_cls_stats']]
                     }
-                        
+                    
                     variables[('task_args.min_num_supports', 
                                'task_args.max_num_supports',
                                'task_args.num_minority',
@@ -370,7 +370,8 @@ def imbalanced_task_test(args, expfiles):
     test_settings = [
         (5, 5,  None, 'balanced'),  # K_min, K_max, N_min, I-distribution 
         (1, 9,  None, 'random'),
-        (4, 6,  None, 'linear'),
+        (3, 7,  None, 'linear'),
+        (1, 9,  None, 'linear'),
         (1, 9,  0.2,  'step')       # N_min expressed as a fraction of 'n_way'
     ]
     test_names = make_names(test_settings, n_way)
@@ -412,7 +413,7 @@ def imbalanced_task_test(args, expfiles):
                 log_name='log_{}'.format(test_name)
             )
             
-def ros_inference(args, expfiles):
+def strategy_inference(args, expfiles):
     n_way=5
     test_settings = [
         (5, 5,  None, 'balanced'),  # K_min, K_max, N_min, I-distribution 
@@ -442,7 +443,7 @@ def ros_inference(args, expfiles):
             assert default_config['strategy'] == strategy
             
             continue_from = os.path.join(args.dest, default_config['experiment_name'])
-            expath = 'ros_inference/{strategy}/' + default_config['experiment_name']
+            expath = 'strategy_inference/{strategy}/' + default_config['experiment_name']
 
             for t, test_setting in enumerate(test_settings):
                 test_name = test_names[t]
@@ -550,14 +551,13 @@ def cub_inference(args, expfiles, save=True):
                 args,
                 save=True
             )
-                    
             
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', default='{gpu}', help='GPU ID')
     parser.add_argument('--dummy_run', type=str2bool, nargs='?', const=True, default=False,
-                        help='Produces a scripts as a dry run with reduced number of tasks, '
-                             'and no saving (useful for debugging)')
+                        help='Produces scripts as a "dry run" with a reduced number of tasks, '
+                             'and no mobel saving (useful for debugging)')
     parser.add_argument('--data_path', type=str, default='./data/',
                         help='Folder with data')
     parser.add_argument('--dest', type=str, default='./experiments/',
@@ -596,32 +596,33 @@ if __name__ == '__main__':
     ]
     
     strategies = [
-        None,
-        'ros',
-        'ros_aug',
-        # 'focal_loss',    # -- left for anyone to try
-        # 'weighted_loss'  # -- left for anyone to try 
+#         None,
+#         'ros',
+#         'ros_aug',
+        'focal_loss',    # -- left for anyone to try 
+        'weighted_loss'  # -- left for anyone to try 
     ]
     
     seeds = [
         0,
-        1,
-        2
+#         1,
+#         2
     ]
     
     balanced_task = (5, 5, None, 'balanced')
     imbalanced_task = (1, 9, None, 'random')
-        
+#     imbalanced_tasks = [(1, 9, None, 'linear'), (1, 9, None, 'linear')]
+    
     if args.minimal:
         models = models[:2]
         strategies = strategies[:2]
         seeds = seeds[:1]
         
     if args.imbalanced_task:
-        # Standard
+        # Standard meta-training
         standard_expfiles = fsl(args, models=models, strategies=[None], seeds=seeds, train_tasks=[balanced_task], 
                                 save=not (args.test or args.inference), expfolder='imbalanced_task/')
-        # Random Shot
+        # Random Shot meta-training
         randomshot_expfiles = fsl(args, models=models, strategies=strategies, seeds=seeds, train_tasks=[imbalanced_task], 
                                   save=not (args.test or args.inference), expfolder='imbalanced_task/')
         
@@ -630,8 +631,8 @@ if __name__ == '__main__':
             imbalanced_task_test(args, randomshot_expfiles)
             
         if args.inference:
-            ros_inference(args, standard_expfiles)
-            ros_inference(args, randomshot_expfiles)
+            strategy_inference(args, standard_expfiles)
+            strategy_inference(args, randomshot_expfiles)
     
     if args.imbalanced_dataset:
         expfiles = imbalanced_dataset(args, models=models, seeds=seeds, save=not (args.test or args.inference))
