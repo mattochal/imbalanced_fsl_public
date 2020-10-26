@@ -97,7 +97,7 @@ class BayesianTAML(ModelTemplate):
             for n_sample in range(num_draws):
                 self.net_reset()
                 kl_loss = self.net_train(support_set)
-                loss,scores = self.net_eval(target_set, ptracker)
+                loss, scores = self.net_eval(target_set, ptracker)
                 sample_scores += scores
                 losses += loss
                 kl_losses += kl_loss * kl_scaling   # <---- This is probably an issue but there's another somewhere as well
@@ -122,7 +122,7 @@ class BayesianTAML(ModelTemplate):
             self.optimizer.zero_grad()
             loss = torch.stack(self.batch_losses).sum(0)
             loss.backward()
-#             torch.nn.utils.clip_grad_norm_(self.all_params, 3)
+#             torch.nn.utils.clip_grad_norm_(self.all_params, 3)  # doesn't do much
             self.optimizer.step()
             self.batch_losses = []
         

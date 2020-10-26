@@ -55,6 +55,7 @@ from models.bmaml import BayesianMAML
 from models.bmaml_chaser import BayesianMAMLChaser
 from models.btaml import BayesianTAML
 from models.knn import KNN
+from models.proto_dkt import ProtoDKT
 
 # Imbalance Strategies
 from strategies.ros import ROS
@@ -83,6 +84,7 @@ MODELS = {
     "baselinepp"  : BaselinePP,    
     "maml"        : Maml,                       
     "gpshot"      : GPShot,
+    "proto_dkt"   : ProtoDKT,
     "simpleshot"  : SimpleShot,
     "protomaml"   : ProtoMaml,
     "bmaml"       : BayesianMAML,
@@ -478,7 +480,7 @@ def get_model(backbone, tasks, datasets, stategy, args, device):
         raise Exception("Model {} does not exist".format(model_name))
 
     if model_name in ["baseline", "baselinepp", "maml", "gpshot", "protomaml", "knn", "simpleshot",
-                     "bmaml", "bmaml_chaser", "btaml", "btaml_star"]:
+                     "bmaml", "bmaml_chaser", "btaml", "btaml_star", "proto_dkt"]:
         output_dims = dict()
         for s in ["train", "val", "test"]:
             output_dims[s] = tasks[s].get_output_dim(args.task_args[s], datasets[s])

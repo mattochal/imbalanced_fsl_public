@@ -580,18 +580,19 @@ if __name__ == '__main__':
     
     
     models = [
-        'protonet',
-        'relationnet',
-        'matchingnet',
-        'gpshot',
-        'simpleshot',
-        'baseline',
-        'baselinepp',
-        'knn',
-        'maml',
-        'protomaml',
-        'bmaml',
-        'bmaml_chaser',
+#         'protonet',
+#         'relationnet',
+#         'matchingnet',
+#         'gpshot',
+#         'simpleshot',
+#         'baseline',
+#         'baselinepp',
+#         'knn',
+#         'maml',
+#         'protomaml',
+#         'bmaml',
+#         'bmaml_chaser',
+        'proto_dkt',
         # 'btaml',  # -- left out due to an implementation error
     ]
     
@@ -605,12 +606,12 @@ if __name__ == '__main__':
     
     seeds = [
         0,
-#         1,
-#         2
+        1, 
+        2
     ]
     
     balanced_task = (5, 5, None, 'balanced')
-#     imbalanced_task = (1, 9, None, 'random')
+#     imbalanced_tasks = [(1, 9, None, 'random')]
     imbalanced_tasks = [
         (1, 9, None, 'linear'), 
         (3, 7, None, 'linear'), 

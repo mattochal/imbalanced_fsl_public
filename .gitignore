@@ -7,4 +7,6 @@ __pycache__/
 zip_code.sh
 code.zip
 data
+graphs
 job_utils/
+visualiser.ipynb

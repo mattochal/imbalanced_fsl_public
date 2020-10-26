@@ -10,7 +10,7 @@ import random
 import argparse
 
 
-class GPShot(ModelTemplate):
+class ProtoDKT(ModelTemplate):
     
     KERNEL_TYPES = ['bncossim', 'linear', 'rbf', 'matern', 'poli1', 'poli2', 'cossim', 'bncossim']
     
@@ -20,7 +20,7 @@ class GPShot(ModelTemplate):
         returns a parser for the given model. Can also return a subparser
         """
         parser = ModelTemplate.get_parser(parser)
-        parser.add_argument('--kernel_type', type=str, choices=GPShot.KERNEL_TYPES, default='bncossim',
+        parser.add_argument('--kernel_type', type=str, choices=ProtoDKT.KERNEL_TYPES, default='bncossim',
                            help='kernel type')
         parser.add_argument('--laplace', type=bool, default=False,
                            help='use laplace approximation during evaluation')
@@ -30,7 +30,7 @@ class GPShot(ModelTemplate):
         return parser
     
     def __init__(self, backbone, strategy, args, device):
-        super(GPShot, self).__init__(backbone, strategy, args, device)
+        super(ProtoDKT, self).__init__(backbone, strategy, args, device)
         self.kernel_type=self.args.kernel_type
         self.laplace=self.args.laplace
         self.output_dim = self.args.output_dim
@@ -89,13 +89,14 @@ class GPShot(ModelTemplate):
             
             all_h = self.forward(all_x)
             all_h, all_y = self.strategy.update_support_features((all_h, all_y))
-            all_y_onehots = uu.onehot(all_y, fill_with=-1, dim=self.output_dim[self.mode]).split(1,1)
-            
+            proto_h, proto_y = self.calc_prototypes(all_h, all_y)
+            proto_h = torch.stack(proto_h)
+            proto_y_onehots = uu.onehot(proto_y, fill_with=-1, dim=self.output_dim[self.mode]).split(1,1)
             self.optimizer.zero_grad()
             
-            total_losses =[]
+            total_losses = []
             for idx in range(self.output_dim[self.mode]):
-                self.gpmodel.set_train_data(inputs=all_h, targets=all_y_onehots[idx].squeeze(), strict=False)
+                self.gpmodel.set_train_data(inputs=proto_h, targets=proto_y_onehots[idx].squeeze(), strict=False)
                 output = self.gpmodel(*self.gpmodel.train_inputs)
                 loss = -self.mll(output, self.gpmodel.train_targets)
                 total_losses.append(loss)
@@ -103,7 +104,6 @@ class GPShot(ModelTemplate):
             loss = torch.stack(total_losses).sum(0)
             
             if len(target_x) > 0:
-#                 with torch.no_grad():
                 self.gpmodel.eval()
                 self.likelihood.eval()
                 self.backbone.eval()
@@ -113,8 +113,8 @@ class GPShot(ModelTemplate):
                 predictions_list = list()
                 for idx in range(self.output_dim[self.mode]):
                     self.gpmodel.set_train_data(
-                        inputs=all_h[:support_n], 
-                        targets=all_y_onehots[idx].squeeze()[:support_n],
+                        inputs=proto_h, 
+                        targets=proto_y_onehots[idx].squeeze(),
                         strict=False)
                     prediction = self.likelihood(self.gpmodel(target_h))
                     predictions_list.append(torch.sigmoid(prediction.mean))
@@ -133,7 +133,6 @@ class GPShot(ModelTemplate):
             loss.backward()
             self.optimizer.step()
             
-        
     def forward(self, x):
         h = self.backbone.forward(x)
         if self.normalize: h = F.normalize(h, p=2, dim=1)
@@ -148,9 +147,9 @@ class GPShot(ModelTemplate):
         support_x, support_y = support_set
         support_h = self.forward(support_x).detach()
         support_h, support_y = self.strategy.update_support_features((support_h, support_y))
-        
-        self.support_y_onehots = uu.onehot(support_y, fill_with=-1, dim=self.output_dim[self.mode]).split(1,1)
-        self.support_h = support_h
+        proto_h, proto_y = self.calc_prototypes(support_h, support_y)
+        self.proto_y_onehots = uu.onehot(proto_y, fill_with=-1, dim=self.output_dim[self.mode]).split(1,1)
+        self.proto_h = torch.stack(proto_h)
     
     def net_eval(self, target_set, ptracker):
         if len(target_set[0]) == 0: return torch.tensor(0.).to(self.device)
@@ -169,8 +168,8 @@ class GPShot(ModelTemplate):
             predictions_list = list()
             for idx in range(self.output_dim[self.mode]):
                 self.gpmodel.set_train_data(
-                    inputs=self.support_h, 
-                    targets=self.support_y_onehots[idx].squeeze(), 
+                    inputs=self.proto_h, 
+                    targets=self.proto_y_onehots[idx].squeeze(), 
                     strict=False)
                 prediction = self.likelihood(self.gpmodel(target_h))
                 predictions_list.append(torch.sigmoid(prediction.mean))
@@ -180,12 +179,46 @@ class GPShot(ModelTemplate):
                 
             pred_y = torch.stack(predictions_list).argmax(0)
             loss = torch.stack(total_losses).sum(0)
-
+            
             ptracker.add_task_performance(
                 pred_y.detach().cpu().numpy(),
                 target_y.detach().cpu().numpy(),
                 loss.detach().cpu().numpy())
     
+    def calc_prototypes(self, h, y):
+        """
+        Computes prototypes
+        """
+        unique_labels = torch.unique(y)
+        proto_h = []
+        for label in unique_labels:
+            proto_h.append(h[y==label].mean(0))
+        return proto_h, unique_labels
+    
+#     def update_memory(self, proto_h, proto_y):
+#         """
+#         Update memory for prototypes
+#         """
+#         labels = proto_y.detach().cpu().numpy()
+#         for i, label in enumerate(labels):
+#             self.proto_memory[int(label)] = proto_h[i]
+    
+#     def get_prototypes(self, y=None):
+#         """
+#         Returns prototypes for the corresponding labels
+#         """
+#         if y is None:
+#             y = np.arange(len(self.proto_memory.keys()))
+#         else:
+#             y = y.detach().cpu().numpy()
+        
+#         proto_h = []
+#         for l in y:
+#             h = self.proto_memory[int(l)]
+#             proto_h.append(h)
+            
+#         proto_h = torch.stack(proto_h, 0)
+#         return proto_h, y
     
 class ExactGPLayer(gpytorch.models.ExactGP):
     '''
