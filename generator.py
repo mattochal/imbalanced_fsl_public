@@ -598,8 +598,8 @@ if __name__ == '__main__':
     
     strategies = [
         None,
-#         'ros',
-#         'ros_aug',
+        'ros',
+        'ros_aug',
 #         'focal_loss',    # -- left for anyone to try 
 #         'weighted_loss'  # -- left for anyone to try 
     ]
