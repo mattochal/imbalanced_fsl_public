@@ -606,17 +606,20 @@ if __name__ == '__main__':
     
     seeds = [
         0,
-        1, 
-        2
+#         1, 
+#         2
     ]
     
-    balanced_task = (5, 5, None, 'balanced')
-#     imbalanced_tasks = [(1, 9, None, 'random')]
+    balanced_tasks = [
+        (5, 5, None, 'balanced')
+    ]
+    
     imbalanced_tasks = [
-        (1, 9, None, 'linear'), 
-        (3, 7, None, 'linear'), 
-        (1, 9, 0.2, 'step'),
-        (1, 9, 0.8, 'step')
+        (1, 9, None, 'random')
+#         (1, 9, None, 'linear'), 
+#         (3, 7, None, 'linear'), 
+#         (1, 9, 0.2, 'step'),
+#         (1, 9, 0.8, 'step')
     ]
     
     if args.minimal:
@@ -626,7 +629,7 @@ if __name__ == '__main__':
         
     if args.imbalanced_task:
         # Standard meta-training
-        standard_expfiles = fsl(args, models=models, strategies=[None], seeds=seeds, train_tasks=[],
+        standard_expfiles = fsl(args, models=models, strategies=[None], seeds=seeds, train_tasks=balanced_tasks,
                                 save=not (args.test or args.inference), expfolder='imbalanced_task/')
         # Random Shot meta-training
         randomshot_expfiles = fsl(args, models=models, strategies=strategies, seeds=seeds, train_tasks=imbalanced_tasks, 
