@@ -212,7 +212,7 @@ def thread_main(args, gpu, lock, threadid, total_jobs):
             
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--gpus", type=int, nargs='+', default=[])
+    parser.add_argument("--gpus", type=int, nargs='+', default=[0])
     parser.add_argument("--jobs_per_gpu", type=int, default=4)
     parser.add_argument("--gpu_file", type=str, default="job_utils/gpus.txt")
     parser.add_argument("--jobs_file", type=str, default="job_utils/new.txt")
@@ -220,7 +220,8 @@ if __name__ == '__main__':
     parser.add_argument("--running_jobs_file", type=str, default="job_utils/running.txt")
     parser.add_argument("--failed_jobs_file", type=str, default="job_utils/failed.txt")
     parser.add_argument("--dummy_run", type=utils.str2bool, nargs='?', const=True, default=False)
-    parser.add_argument("--idle_finished", type=utils.str2bool, nargs='?', const=True, default=False)
+    parser.add_argument("--idle_finished", type=utils.str2bool, nargs='?', const=True, default=True)
+    parser.add_argument("--mute", type=int, nargs='+', default=[])  # temporarely stop running gpus
     args = parser.parse_args()
     
     if args.dummy_run:
@@ -233,9 +234,10 @@ if __name__ == '__main__':
     if len(gpus_available) == 0:
         gpus_available = get_available_gpus(args.gpu_file)
     else:
-        # save given gpus
+        # save given gpus, mute those that are out
+        temp = [gpu for gpu in gpus_available if gpu not in mute]
         with open(args.gpu_file, "w") as f:
-            f.write(','.join(map(str,gpus_available)))
+            f.write(','.join(map(str,temp)))
     
     if len(gpus_available) == 0 or args.jobs_per_gpu <= 0:
         print("more than one gpu required")
