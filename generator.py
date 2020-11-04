@@ -144,8 +144,8 @@ def hyperparameter_combinations(variables):
     return unpacked_combinations
 
 
-def get_python_script(exp_kwargs={}):
-    script = 'python src/main.py '
+def get_python_script(exp_kwargs={}, bash=False):
+    script = 'python {}src/main.py '.format(os.path.abspath(".")+"/" if bash else "")
     for arg in exp_kwargs:
         script += '--{} {} '.format(arg, exp_kwargs[arg])
     return script
@@ -154,7 +154,7 @@ def get_python_script(exp_kwargs={}):
 def get_bash_script(exp_kwargs={}):
     script = 'export CUDA_VISIBLE_DEVICES=$1; \n'
     exp_kwargs['gpu'] = 0
-    script += get_python_script(exp_kwargs) + ' $2'
+    script += get_python_script(exp_kwargs, bash=True) + ' $2'
     return script
     
 
@@ -208,12 +208,15 @@ def generate_experiments(experiment_name_template, variables, default_config, ar
         config['ptracker_args'] = flatten_dict(config['ptracker_args'])
         config['strategy_args'] = flatten_dict(config['strategy_args'])
         
-        config_path = os.path.join(args.dest, experiment_name, 'configs', '{}.json'.format(config_name))
-        script_path = os.path.join(args.dest, experiment_name, 'scripts', '{}.sh'.format(script_name))
-        output_path = os.path.join(args.dest, experiment_name, 'logs', '{}.txt'.format(log_name))
+        config_path = os.path.join(args.results_folder, experiment_name, 'configs', '{}.json'.format(config_name))
+        script_path = os.path.join(args.results_folder, experiment_name, 'scripts', '{}.sh'.format(script_name))
+        output_path = os.path.join(args.results_folder, experiment_name, 'logs', '{}.txt'.format(log_name))
         
         if args.bash:
-            script_content = get_bash_script(exp_kwargs={'args_file': config_path, 'gpu':gpu})
+            config_path = os.path.abspath(config_path)
+            script_path = os.path.abspath(script_path)
+            output_path = os.path.abspath(output_path)
+            script_content = get_bash_script(exp_kwargs={'args_file': config_path, 'gpu':gpu}) + '\n'
             script = 'bash {} {} '.format(script_path, gpu)
         else:
             script_content = get_python_script(exp_kwargs={'args_file': config_path, 'gpu':gpu})
@@ -264,7 +267,7 @@ def fsl(args, models=[], strategies=[], seeds=[], train_tasks=[], var_update={},
                 train_name = make_names([train_task], n_way)[0]
                 for strategy in strategies:
                     variables = {
-                        'results_folder'             : [args.dest],
+                        'results_folder'             : [os.path.abspath(args.results_folder)],
                         'seed'                       : [seed],
                         'backbone'                   : ['Conv4'],
                         'num_epochs'                 : [200],
@@ -370,8 +373,8 @@ def imbalanced_task_test(args, expfiles):
     test_settings = [
         (5, 5,  None, 'balanced'),  # K_min, K_max, N_min, I-distribution 
         (1, 9,  None, 'random'),
-        (3, 7,  None, 'linear'),
-        (1, 9,  None, 'linear'),
+#         (3, 7,  None, 'linear'),
+#         (1, 9,  None, 'linear'),
         (1, 9,  0.2,  'step')       # N_min expressed as a fraction of 'n_way'
     ]
     test_names = make_names(test_settings, n_way)
@@ -442,7 +445,7 @@ def strategy_inference(args, expfiles):
             assert default_config['task'] == 'fsl_imbalanced'
             assert default_config['strategy'] == strategy
             
-            continue_from = os.path.join(args.dest, default_config['experiment_name'])
+            continue_from = os.path.join(args.results_folder, default_config['experiment_name'])
             expath = 'strategy_inference/{strategy}/' + default_config['experiment_name']
 
             for t, test_setting in enumerate(test_settings):
@@ -534,7 +537,7 @@ def cub_inference(args, expfiles, save=True):
             script, script_path, config, config_path = experiment
             default_config = get_default_config()
             default_config = substitute_hyperparameters(default_config, config)
-            continue_from = os.path.join(args.dest, default_config['experiment_name'])
+            continue_from = os.path.join(args.results_folder, default_config['experiment_name'])
             expath = 'cub_inference/{dataset}/' + default_config['experiment_name']
             
             variables = {
@@ -558,9 +561,9 @@ if __name__ == '__main__':
     parser.add_argument('--dummy_run', type=str2bool, nargs='?', const=True, default=False,
                         help='Produces scripts as a "dry run" with a reduced number of tasks, '
                              'and no mobel saving (useful for debugging)')
-    parser.add_argument('--data_path', type=str, default='./data/',
+    parser.add_argument('--data_path', type=str, default='/media/disk2/mateusz/data/pkl/',
                         help='Folder with data')
-    parser.add_argument('--dest', type=str, default='./experiments/',
+    parser.add_argument('--results_folder', type=str, default='./experiments/',
                         help='Folder for saving the experiment config/scripts/logs into')
     parser.add_argument('--imbalanced_task', type=str2bool, nargs='?', const=True, default=False,
                         help='Generate imbalanced support set experiments')
@@ -578,20 +581,21 @@ if __name__ == '__main__':
                         help='Generate minimal experiments.')
     args = parser.parse_args()
     
+    args.results_folder = os.path.abspath(args.results_folder)
     
     models = [
-#         'protonet',
-#         'relationnet',
-#         'matchingnet',
-#         'gpshot',
-#         'simpleshot',
-#         'baseline',
-#         'baselinepp',
-#         'knn',
-#         'maml',
-#         'protomaml',
-#         'bmaml',
-#         'bmaml_chaser',
+        'protonet',
+        'relationnet',
+        'matchingnet',
+        'gpshot',
+        'simpleshot',
+        'baseline',
+        'baselinepp',
+        'knn',
+        'maml',
+        'protomaml',
+        'bmaml',
+        'bmaml_chaser',
         'proto_dkt',
         # 'btaml',  # -- left out due to an implementation error
     ]
@@ -606,8 +610,8 @@ if __name__ == '__main__':
     
     seeds = [
         0,
-#         1, 
-#         2
+        1, 
+        2
     ]
     
     balanced_tasks = [
@@ -615,8 +619,8 @@ if __name__ == '__main__':
     ]
     
     imbalanced_tasks = [
-        (1, 9, None, 'random')
-#         (1, 9, None, 'linear'), 
+#         (1, 9, None, 'random')
+        (1, 9, None, 'linear'), 
 #         (3, 7, None, 'linear'), 
 #         (1, 9, 0.2, 'step'),
 #         (1, 9, 0.8, 'step')
