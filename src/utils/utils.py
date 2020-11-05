@@ -55,7 +55,7 @@ from models.bmaml import BayesianMAML
 from models.bmaml_chaser import BayesianMAMLChaser
 from models.btaml import BayesianTAML
 from models.knn import KNN
-from models.proto_dkt import ProtoDKT
+from models.protodkt import ProtoDKT
 
 # Imbalance Strategies
 from strategies.ros import ROS
@@ -84,6 +84,7 @@ MODELS = {
     "baselinepp"  : BaselinePP,    
     "maml"        : Maml,                       
     "gpshot"      : GPShot,
+    "protodkt"    : ProtoDKT,
     "proto_dkt"   : ProtoDKT,
     "simpleshot"  : SimpleShot,
     "protomaml"   : ProtoMaml,
@@ -480,7 +481,7 @@ def get_model(backbone, tasks, datasets, stategy, args, device):
         raise Exception("Model {} does not exist".format(model_name))
 
     if model_name in ["baseline", "baselinepp", "maml", "gpshot", "protomaml", "knn", "simpleshot",
-                     "bmaml", "bmaml_chaser", "btaml", "btaml_star", "proto_dkt"]:
+                     "bmaml", "bmaml_chaser", "btaml", "btaml_star", "protodkt", "proto_dkt"]:
         output_dims = dict()
         for s in ["train", "val", "test"]:
             output_dims[s] = tasks[s].get_output_dim(args.task_args[s], datasets[s])
@@ -491,9 +492,9 @@ def get_model(backbone, tasks, datasets, stategy, args, device):
         
     if model_name in ['btaml'] and args.model_args['max_shot'] == -1:
         if args.task in ['fsl']:
-            maxshot = max([args.task_args[setname].num_samples for setname in ['train', 'test', 'val']])
+            maxshot = max([args.task_args[setname].num_supports for setname in ['train', 'test', 'val']])
         if args.task in ['fsl_imbalanced']:
-            maxshot = max([args.task_args[setname].max_num_samples for setname in ['train', 'test', 'val']])
+            maxshot = max([args.task_args[setname].max_num_supports for setname in ['train', 'test', 'val']])
         args.model_args['max_shot'] = maxshot
     
     # Update model_args
