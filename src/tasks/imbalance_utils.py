@@ -62,6 +62,6 @@ def get_num_samples_per_class(imbalance_distribution, num_classes, min_num_sampl
         raise Exception("Imbalance distribution not found: {}".format(imbalance_distribution))
     
     if imbalance_distribution in ['__linear', '__step']:
-        num_samples = np.random.shuffle(num_samples)
+        np.random.shuffle(num_samples)
     
     return num_samples
