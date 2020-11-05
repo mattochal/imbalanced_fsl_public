@@ -298,10 +298,12 @@ def fsl(args, models=[], strategies=[], seeds=[], train_tasks=[], var_update={},
                     expath = expfolder + '{dataset}/{backbone}/train_on_' + train_name + '_{strategy}/{model}/'
 #                             '{num_epochs}epochs_{num_tasks_per_epoch}tasks/'
                     
-                    if model == 'protonet':
+                    if model in ['protonet','protodkt','gpshot']:
                         variables[(
                             'task_args.train.num_classes', 
-                            'task_args.train.num_targets')] = [(20, 5), (5, 16)]
+                            'task_args.train.num_targets')] = [(20, 5), 
+#                                                                (5, 16)
+                                                              ]
                         expath += '{task_args.train.num_classes}trainway/'
 
                     elif model in ['baseline', 'baselinepp', 'knn']:
@@ -596,8 +598,8 @@ if __name__ == '__main__':
 #         'protomaml',
 #         'bmaml',
 #         'bmaml_chaser',
-#         'proto_dkt',
-        # 'btaml',  # -- left out due to an implementation error
+        'protodkt',
+#         'btaml',  # -- left out due to an implementation error
     ]
     
     strategies = [
@@ -610,8 +612,8 @@ if __name__ == '__main__':
     
     seeds = [
         0,
-        1, 
-        2
+#         1, 
+#         2
     ]
     
     balanced_tasks = [
