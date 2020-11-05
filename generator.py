@@ -584,26 +584,26 @@ if __name__ == '__main__':
     args.results_folder = os.path.abspath(args.results_folder)
     
     models = [
-        'protonet',
-        'relationnet',
-        'matchingnet',
+#         'protonet',
+#         'relationnet',
+#         'matchingnet',
         'gpshot',
-        'simpleshot',
-        'baseline',
-        'baselinepp',
-        'knn',
-        'maml',
-        'protomaml',
-        'bmaml',
-        'bmaml_chaser',
-        'proto_dkt',
+#         'simpleshot',
+#         'baseline',
+#         'baselinepp',
+#         'knn',
+#         'maml',
+#         'protomaml',
+#         'bmaml',
+#         'bmaml_chaser',
+#         'proto_dkt',
         # 'btaml',  # -- left out due to an implementation error
     ]
     
     strategies = [
         None,
-        'ros',
-        'ros_aug',
+#         'ros',
+#         'ros_aug',
 #         'focal_loss',    # -- left for anyone to try 
 #         'weighted_loss'  # -- left for anyone to try 
     ]
@@ -620,7 +620,7 @@ if __name__ == '__main__':
     
     imbalanced_tasks = [
 #         (1, 9, None, 'random')
-        (1, 9, None, 'linear'), 
+#         (1, 9, None, 'linear'), 
 #         (3, 7, None, 'linear'), 
 #         (1, 9, 0.2, 'step'),
 #         (1, 9, 0.8, 'step')
