@@ -337,7 +337,7 @@ def fsl(args, models=[], strategies=[], seeds=[], train_tasks=[], var_update={},
                     elif model == 'btaml':
                         variables['backbone_channel_dim'] = [64]
                         variables['model_args.lr'] = [0.0001]
-                        variables['model_args.approx'] = [True]
+                        variables[('model_args.approx','model_args.approx_until')] = [(True,50),(True,25),(False,0)]
                         variables['model_args.batch_size'] = [4]
                         variables['model_args.inner_loop_lr'] = [0.1]
                         variables['model_args.num_inner_loop_steps'] = [10]
@@ -345,6 +345,9 @@ def fsl(args, models=[], strategies=[], seeds=[], train_tasks=[], var_update={},
                                    'model_args.omega_on',
                                    'model_args.gamma_on',
                                    'model_args.z_on')] = [(True, True, True, True)]
+                        expath += "{model_args.alpha_on}a_{model_args.omega_on}o_" + \
+                                   "{model_args.gamma_on}g_" + \
+                                   "{model_args.z_on}z_{model_args.approx_until}till/"
 #                         expath += '{model_args.batch_size}trainbatch_'+ \
 #                                   '{model_args.inner_loop_lr}innerlr_' + \
 #                                   '{model_args.num_inner_loop_steps}innersteps/'
@@ -589,7 +592,7 @@ if __name__ == '__main__':
 #         'protonet',
 #         'relationnet',
 #         'matchingnet',
-        'gpshot',
+#         'gpshot',
 #         'simpleshot',
 #         'baseline',
 #         'baselinepp',
@@ -598,8 +601,8 @@ if __name__ == '__main__':
 #         'protomaml',
 #         'bmaml',
 #         'bmaml_chaser',
-        'protodkt',
-#         'btaml',  # -- left out due to an implementation error
+#         'protodkt',
+        'btaml',  # -- left out due to an implementation error
     ]
     
     strategies = [
@@ -621,7 +624,7 @@ if __name__ == '__main__':
     ]
     
     imbalanced_tasks = [
-#         (1, 9, None, 'random')
+        (1, 9, None, 'random')
 #         (1, 9, None, 'linear'), 
 #         (3, 7, None, 'linear'), 
 #         (1, 9, 0.2, 'step'),

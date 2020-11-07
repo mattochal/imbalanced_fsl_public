@@ -21,7 +21,9 @@ class BayesianTAML(ModelTemplate):
         parser = ModelTemplate.get_parser(parser)
         parser.add_argument('--num_inner_loop_steps', type=int, default=10)
         parser.add_argument('--inner_loop_lr', type=float, default=0.1)
-        parser.add_argument('--approx', type=utils.str2bool, default=True)
+        parser.add_argument('--approx', type=utils.str2bool, default=False)
+        parser.add_argument('--approx_until', type=int, default=0,
+                           help='approx until the specified epoch to expediate training')
         parser.add_argument('--batch_size', type=int, default=4,
                            help='number of tasks before the outerloop update, eg. update meta learner every 4th task')
         parser.add_argument('--output_dim', type=dict, default={"train":-1, "val":-1, "test":-1},
@@ -39,6 +41,7 @@ class BayesianTAML(ModelTemplate):
     def __init__(self, backbone, strategy, args, device):
         super(BayesianTAML, self).__init__(backbone, strategy, args, device)
         self.approx = args.approx
+        self.approx_until = args.approx_until
         self.inner_loop_lr = args.inner_loop_lr
         self.num_steps = args.num_inner_loop_steps
         self.output_dim = args.output_dim
@@ -82,6 +85,7 @@ class BayesianTAML(ModelTemplate):
         self.net_reset()
         self.zero_grad()
         self.batch_count += 1
+        self.approx = self.approx if self.epoch < self.approx_until else False
         
         num_draws = self.num_draws[self.mode]
         
@@ -100,7 +104,7 @@ class BayesianTAML(ModelTemplate):
                 loss, scores = self.net_eval(target_set, ptracker)
                 sample_scores += scores
                 losses += loss
-                kl_losses += kl_loss * kl_scaling   # <---- This is probably an issue but there's another somewhere as well
+                kl_losses += kl_loss * kl_scaling
             
             losses /= num_draws
             kl_losses /= num_draws
@@ -182,19 +186,19 @@ class BayesianTAML(ModelTemplate):
             losses = self.loss_fn(scores, support_y)
             
             if self.omega_on:
-                set_loss = 0.
-                for i_class in uniq_y:
-                    class_loss = losses[support_y==i_class].sum()
-                    class_loss = class_loss * omega[i_class]
+                set_loss = 0.  # inner loss
+                scaling = len(uniq_y) / len(support_y)  # number of classes per sample 
+                for i_class in uniq_y:  # per class loss
+                    class_loss = losses[support_y==i_class].sum() * scaling * omega[i_class]
                     set_loss += class_loss
-                set_loss = set_loss * len(uniq_y) / len(support_y)  # dividing by average number of samples per class 
+                set_loss = set_loss
             else:
                 set_loss = torch.mean(losses)
             
             grad = torch.autograd.grad(
                 set_loss, 
                 self.fast_parameters,
-                create_graph=True) # build full graph support gradient of gradient
+                create_graph=True)
 
             if self.approx:
                 grad = [ g.detach() for g in grad ]
