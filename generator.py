@@ -423,18 +423,25 @@ def imbalanced_task_test(args, expfiles):
             
 def strategy_inference(args, expfiles):
     n_way=5
-    test_settings = [
-        (5, 5,  None, 'balanced'),  # K_min, K_max, N_min, I-distribution 
-        (1, 9,  None, 'random'),
-        (4, 6,  None, 'linear'),
-        (1, 9,  0.2,  'step')       # N_min expressed as a fraction of 'n_way'
+    test_settings = [  
+        (1, 9,  None, "linear"),
+        (2, 8,  None, "linear"),
+        (3, 7,  None, "linear"),
+        (4, 6,  None, "linear"),
+        (5, 5,  None, 'linear'),  # K_min, K_max, N_min, I-distribution    
+        
+#         (1, 9,  None, 'random'),
+#         (4, 6,  None, 'linear'),
+#         (1, 9,  0.2,  'step')       # N_min expressed as a fraction of 'n_way'
     ]
     test_names = make_names(test_settings, n_way)
     
     # Inference Strategies
     strategies = [
-        'ros',
-        'ros_aug'
+#         'ros',
+#         'ros_aug',
+        'weighted_loss',
+        'focal_loss'
     ]
     
     for experiment in expfiles:
@@ -594,15 +601,15 @@ if __name__ == '__main__':
 #         'matchingnet',
 #         'gpshot',
 #         'simpleshot',
-#         'baseline',
-#         'baselinepp',
+        'baseline',
+        'baselinepp',
 #         'knn',
-#         'maml',
-#         'protomaml',
-#         'bmaml',
-#         'bmaml_chaser',
+        'maml',
+        'protomaml',
+        'bmaml',
+        'bmaml_chaser',
 #         'protodkt',
-        'btaml',  # -- left out due to an implementation error
+#         'btaml',  # -- left out due to an implementation error
     ]
     
     strategies = [
@@ -615,8 +622,8 @@ if __name__ == '__main__':
     
     seeds = [
         0,
-#         1, 
-#         2
+        1, 
+        2
     ]
     
     balanced_tasks = [
