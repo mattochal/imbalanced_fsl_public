@@ -620,12 +620,12 @@ if __name__ == '__main__':
     ]
     
     strategies = [
-#         None,
+        None,
 #         'ros',
 #         'ros_aug',
 #         'focal_loss',    # -- left for anyone to try 
 #         'weighted_loss',  # -- left for anyone to try 
-        'cb_loss'
+#         'cb_loss'
     ]
     
     seeds = [

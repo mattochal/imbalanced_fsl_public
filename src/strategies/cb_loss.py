@@ -17,6 +17,7 @@ class CBLoss(StrategyTemplate):
     def __init__(self, args, device, seed):
         super(CBLoss, self).__init__(args, device, seed)
         self.inv_clas_freq = []
+        self.beta = args.beta
         
     def update_support_set(self, support):
         support = super(CBLoss, self).update_support_set(support)
