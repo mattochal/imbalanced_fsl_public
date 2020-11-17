@@ -62,6 +62,7 @@ from strategies.ros import ROS
 from strategies.ros_aug import ROS_AUG
 from strategies.focal_loss import FocalLoss
 from strategies.weighted_loss import WeightedLoss
+from strategies.cb_loss import CBLoss
 from strategies.strategy_template import StrategyTemplate
 
 TASKS = {
@@ -110,6 +111,7 @@ STRATEGIES = {
     "ros_aug"      : ROS_AUG,
     "weighted_loss": WeightedLoss,
     "focal_loss"   : FocalLoss,
+    "cb_loss"      : CBLoss,
     None           : StrategyTemplate,
     "None"         : StrategyTemplate,
 }

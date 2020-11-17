@@ -440,8 +440,9 @@ def strategy_inference(args, expfiles):
     strategies = [
 #         'ros',
 #         'ros_aug',
-        'weighted_loss',
-        'focal_loss'
+#         'weighted_loss',
+#         'focal_loss',
+        'cb_loss',
     ]
     
     for experiment in expfiles:
@@ -458,8 +459,7 @@ def strategy_inference(args, expfiles):
             assert default_config['strategy'] == strategy
             
             continue_from = os.path.join(args.results_folder, default_config['experiment_name'])
-            expath = 'strategy_inference/{strategy}/' + default_config['experiment_name']
-
+            
             for t, test_setting in enumerate(test_settings):
                 test_name = test_names[t]
                 min_k, max_k, minor, dist = test_setting
@@ -475,7 +475,14 @@ def strategy_inference(args, expfiles):
                     'task_args.test.num_minority':           [minor],
                     'task_args.test.imbalance_distribution': [dist]
                 }
+                expath = 'strategy_inference/{strategy}/'
 
+                if strategy == 'cb_loss':
+                    variables['strategy_args.beta'] = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,0.99]
+                    expath += "{strategy_args.beta}beta/"
+                
+                expath += default_config['experiment_name']
+                    
                 generate_experiments(
                     expath,
                     variables, 
@@ -613,17 +620,18 @@ if __name__ == '__main__':
     ]
     
     strategies = [
-        None,
+#         None,
 #         'ros',
 #         'ros_aug',
 #         'focal_loss',    # -- left for anyone to try 
-#         'weighted_loss'  # -- left for anyone to try 
+#         'weighted_loss',  # -- left for anyone to try 
+        'cb_loss'
     ]
     
     seeds = [
         0,
-        1, 
-        2
+#         1, 
+#         2
     ]
     
     balanced_tasks = [
