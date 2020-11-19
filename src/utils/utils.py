@@ -61,6 +61,7 @@ from strategies.ros import ROS
 from strategies.ros_aug import ROS_AUG
 from strategies.focal_loss import FocalLoss
 from strategies.weighted_loss import WeightedLoss
+from strategies.cb_loss import CBLoss
 from strategies.strategy_template import StrategyTemplate
 
 TASKS = {
@@ -107,6 +108,7 @@ STRATEGIES = {
     "ros_aug"      : ROS_AUG,
     "weighted_loss": WeightedLoss,
     "focal_loss"   : FocalLoss,
+    "cb_loss"      : CBLoss,
     None           : StrategyTemplate,
     "None"         : StrategyTemplate,
 }
@@ -489,9 +491,9 @@ def get_model(backbone, tasks, datasets, stategy, args, device):
         
     if model_name in ['btaml'] and args.model_args['max_shot'] == -1:
         if args.task in ['fsl']:
-            maxshot = max([args.task_args[setname].num_samples for setname in ['train', 'test', 'val']])
+            maxshot = max([args.task_args[setname].num_supports for setname in ['train', 'test', 'val']])
         if args.task in ['fsl_imbalanced']:
-            maxshot = max([args.task_args[setname].max_num_samples for setname in ['train', 'test', 'val']])
+            maxshot = max([args.task_args[setname].max_num_supports for setname in ['train', 'test', 'val']])
         args.model_args['max_shot'] = maxshot
     
     # Update model_args

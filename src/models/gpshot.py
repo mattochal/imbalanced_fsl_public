@@ -156,7 +156,7 @@ class GPShot(ModelTemplate):
         if len(target_set[0]) == 0: return torch.tensor(0.).to(self.device)
         
         target_x, target_y = target_set
-        target_y_onehots = onehot(target_y, fill_with=-1, dim=self.output_dim[self.mode]).split(1,1)
+        target_y_onehots = uu.onehot(target_y, fill_with=-1, dim=self.output_dim[self.mode]).split(1,1)
         
         with torch.no_grad():
             self.gpmodel.eval()
