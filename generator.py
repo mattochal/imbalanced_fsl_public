@@ -73,6 +73,7 @@ def flatten_dict(d, prefix=None, seperator='.', value_map=lambda x: x):
             
     
 def substitute_hyperparameters(config, hyperparameters):
+#     import pdb; pdb.set_trace()
     hyperparameters = convert_to_nested_dict(hyperparameters)
     dataset_args = hyperparameters['dataset_args'] if 'dataset_args' in hyperparameters else dict() 
     task_args = hyperparameters['task_args'] if 'task_args' in hyperparameters else dict() 
@@ -246,16 +247,20 @@ def generate_experiments(experiment_name_template, variables, default_config, ar
     return zip(scripts, script_paths, configs, config_paths)        
         
         
-def make_names(test_settings, way):
+def make_names(settings, way):
     test_names = []
-    for setting in test_settings:
-        min_k, max_k, minor, dist = setting
-        test_names.append('{}-{}shot_{}{}'.format(min_k, max_k, dist, "" if minor is None 
-                                                  else '_{}minor'.format(int(minor*way))))
+    for setting in settings:
+        min_k, max_k, minor, dist, t_min_k, t_max_k, t_minor, t_dist  = setting
+        test_names.append('{}-{}shot_{}{}_{}-{}query_{}{}'.format(min_k, max_k, dist, 
+                                                           "" if minor is None else '_{}minor'.format(int(minor*way)), 
+                                                           t_min_k, t_max_k, t_dist, 
+                                                           "" if t_minor is None else '_{}minor'.format(int(t_minor*way)), 
+                                                          ))
     return test_names
 
     
-def fsl(args, models=[], strategies=[], seeds=[], train_tasks=[], var_update={}, save=True, expfolder=''):
+def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], test_tasks=[], var_update={}, save=True, 
+                   expfolder=''):
     
     n_way = 5
     dataset = 'mini'
@@ -265,6 +270,9 @@ def fsl(args, models=[], strategies=[], seeds=[], train_tasks=[], var_update={},
         for model in models:
             for train_task in train_tasks:
                 train_name = make_names([train_task], n_way)[0]
+#                 print(train_task)
+#                 print(train_name)
+                
                 for strategy in strategies:
                     variables = {
                         'results_folder'             : [os.path.abspath(args.results_folder)],
@@ -281,7 +289,6 @@ def fsl(args, models=[], strategies=[], seeds=[], train_tasks=[], var_update={},
                         'model_args.lr_decay_step'   : [100],
                         'task'                       : ['fsl_imbalanced'],
                         'task_args.batch_size'       : [1],
-                        'task_args.num_targets'      : [16],
                         'task_args.num_classes'      : [n_way],
                         'dataset'                    : [dataset],
                         'dataset_args.data_path'     : [args.data_path],
@@ -292,18 +299,35 @@ def fsl(args, models=[], strategies=[], seeds=[], train_tasks=[], var_update={},
                     variables[('task_args.min_num_supports', 
                                'task_args.max_num_supports',
                                'task_args.num_minority',
-                               'task_args.imbalance_distribution')] = [train_task]
+                               'task_args.imbalance_distribution', 
+                               'task_args.min_num_targets', 
+                               'task_args.max_num_targets',
+                               'task_args.num_minority_targets',
+                               'task_args.imbalance_distribution_targets')] = [train_task]
+                    
+                    if len(test_tasks) > 0:
+                        variables[('task_args.test.min_num_supports', 
+                                   'task_args.test.max_num_supports',
+                                   'task_args.test.num_minority',
+                                   'task_args.test.imbalance_distribution', 
+                                   'task_args.test.min_num_targets', 
+                                   'task_args.test.max_num_targets',
+                                   'task_args.test.num_minority_targets',
+                                   'task_args.test.imbalance_distribution_targets')] = test_tasks
                     
                     # experiment path
-                    expath = expfolder + '{dataset}/{backbone}/train_on_' + train_name + '_{strategy}/{model}/'
+                    expath = expfolder + '{dataset}/{backbone}/train_on_' + train_name + '/{strategy}/{model}/'
 #                             '{num_epochs}epochs_{num_tasks_per_epoch}tasks/'
                     
-                    if model in ['protonet','protodkt','gpshot']:
-                        variables[(
-                            'task_args.train.num_classes', 
-                            'task_args.train.num_targets')] = [(20, 5), 
-#                                                                (5, 16)
-                                                              ]
+                    if model in ['protonet', 'protodkt']:
+#                         variables[(
+#                             'task_args.train.num_classes', 
+#                             'task_args.train.min_num_targets',
+#                             'task_args.train.max_num_targets')] = [
+# #                                                                 (20, max(1,int(target_imbalance[0]/3)),
+# #                                                                  int(target_imbalance[1]/3)), 
+#                                                                 (5, 15, 15)
+#                                                               ]
                         expath += '{task_args.train.num_classes}trainway/'
 
                     elif model in ['baseline', 'baselinepp', 'knn']:
@@ -366,6 +390,11 @@ def fsl(args, models=[], strategies=[], seeds=[], train_tasks=[], var_update={},
                         
                     expath += '{seed}/'
                     variables.update(var_update)
+                    
+#                     print(expath)
+                    
+#                     print(variables)
+                    
                     config = get_default_config()
                     expfiles = generate_experiments(expath, variables, config, args, save=save)
                     experiement_files.extend(expfiles)
@@ -381,6 +410,9 @@ def imbalanced_task_test(args, expfiles):
 #         (3, 7,  None, 'linear'),
 #         (1, 9,  None, 'linear'),
         (1, 9,  0.2,  'step')       # N_min expressed as a fraction of 'n_way'
+    ]
+    target_imbalance = [
+        (15, 15,  None, 'balanced')
     ]
     test_names = make_names(test_settings, n_way)
     
@@ -403,12 +435,16 @@ def imbalanced_task_test(args, expfiles):
                 'evaluate_on_test_set_only':             [True],
                 'test_performance_tag':                  [test_name],
                 'task_args.test.num_classes':            [n_way],
-                'task_args.test.num_targets':            [16],
                 'task_args.test.min_num_supports':       [min_k],
                 'task_args.test.max_num_supports':       [max_k],
                 'task_args.test.num_minority':           [minor],
                 'task_args.test.imbalance_distribution': [dist] 
             }
+            
+            variables[('task_args.test.min_num_targets', 
+                       'task_args.test.max_num_targets',
+                       'task_args.test.num_minority_tagets',
+                       'task_args.test.imbalance_distribution_targets')] = target_imbalance
             
             generate_experiments(
                 default_config['experiment_name'], 
@@ -420,6 +456,7 @@ def imbalanced_task_test(args, expfiles):
                 script_name='script_{}'.format(test_name),
                 log_name='log_{}'.format(test_name)
             )
+    
             
 def strategy_inference(args, expfiles):
     n_way=5
@@ -512,7 +549,7 @@ def imbalanced_dataset(args, models=[], seeds=[], save=True):
     is_baseline = lambda x: x in ['baseline', 'baselinepp', 'knn']
     
     experiement_files = []
-    for experiment in fsl(args, models=models, strategies=strategies, seeds=seeds, var_update=var_update,
+    for experiment in fsl_imbalanced(args, models=models, strategies=strategies, seeds=seeds, var_update=var_update,
                           train_tasks=train_tasks, save=False):
         
         script, script_path, config, config_path = experiment
@@ -586,6 +623,8 @@ if __name__ == '__main__':
                         help='Folder for saving the experiment config/scripts/logs into')
     parser.add_argument('--imbalanced_task', type=str2bool, nargs='?', const=True, default=False,
                         help='Generate imbalanced support set experiments')
+    parser.add_argument('--imbalanced_targets', type=str2bool, nargs='?', const=True, default=False,
+                        help='Generate imbalanced target set experiments')
     parser.add_argument('--imbalanced_dataset', type=str2bool, nargs='?', const=True, default=False,
                         help='Generate imbalanced dataset experiments')
     parser.add_argument('--test', type=str2bool, nargs='?', const=True, default=False,
@@ -603,10 +642,10 @@ if __name__ == '__main__':
     args.results_folder = os.path.abspath(args.results_folder)
     
     models = [
-#         'protonet',
-#         'relationnet',
+        'protonet',
+        'relationnet',
 #         'matchingnet',
-#         'gpshot',
+        'gpshot',
 #         'simpleshot',
         'baseline',
         'baselinepp',
@@ -614,7 +653,7 @@ if __name__ == '__main__':
         'maml',
         'protomaml',
         'bmaml',
-        'bmaml_chaser',
+#         'bmaml_chaser',
 #         'protodkt',
 #         'btaml',  # -- left out due to an implementation error
     ]
@@ -635,11 +674,12 @@ if __name__ == '__main__':
     ]
     
     balanced_tasks = [
-        (5, 5, None, 'balanced')
+        (5, 5, None, 'balanced', 15, 15, None, 'balanced')
     ]
     
     imbalanced_tasks = [
-        (1, 9, None, 'random')
+        (1, 9, None, 'linear', 15, 15, None, 'balanced')
+#         (1, 9, None, 'random')
 #         (1, 9, None, 'linear'), 
 #         (3, 7, None, 'linear'), 
 #         (1, 9, 0.2, 'step'),
@@ -651,13 +691,15 @@ if __name__ == '__main__':
         strategies = strategies[:2]
         seeds = seeds[:1]
         
+        
     if args.imbalanced_task:
         # Standard meta-training
-        standard_expfiles = fsl(args, models=models, strategies=[None], seeds=seeds, train_tasks=balanced_tasks,
+        standard_expfiles = fsl_imbalanced(args, models=models, strategies=[None], seeds=seeds, train_tasks=balanced_tasks,
                                 save=not (args.test or args.inference), expfolder='imbalanced_task/')
         # Random Shot meta-training
-        randomshot_expfiles = fsl(args, models=models, strategies=strategies, seeds=seeds, train_tasks=imbalanced_tasks, 
-                                  save=not (args.test or args.inference), expfolder='imbalanced_task/')
+        randomshot_expfiles = fsl_imbalanced(args, models=models, strategies=strategies, seeds=seeds, 
+                                             train_tasks=imbalanced_tasks,  save=not (args.test or args.inference), 
+                                             expfolder='imbalanced_task/')
         
         if args.test: 
             imbalanced_task_test(args, standard_expfiles)
@@ -667,6 +709,29 @@ if __name__ == '__main__':
             strategy_inference(args, standard_expfiles)
             strategy_inference(args, randomshot_expfiles)
     
+    if args.imbalanced_targets:
+        # Standard meta-training
+        train_tasks = [
+            (5, 5, None, 'balanced', 5, 5, None, 'balanced'),
+            (5, 5, None, 'balanced', 1, 9, None, 'linear'),
+            (1, 9, None, 'linear', 5, 5, None, 'balanced'),
+            (1, 9, None, 'linear', 1, 9, None, 'linear'),
+        ]
+        
+        test_tasks = [
+            (1, 9, None, 'linear', 5, 5, None, 'balanced')
+        ]
+        
+        expfiles = fsl_imbalanced(args, models=models, strategies=[None], seeds=seeds, train_tasks=train_tasks, 
+                                  test_tasks=test_tasks, save=not(args.test or args.inference), expfolder='imbalanced_targets/')
+        
+        if args.test:
+            imbalanced_target_test(args, expfiles)
+            
+        if args.inference:
+            print('Strategy inference for imbalnaced target set not yet implemented.')
+    
+    
     if args.imbalanced_dataset:
         expfiles = imbalanced_dataset(args, models=models, seeds=seeds, save=not (args.test or args.inference))
         
@@ -675,8 +740,9 @@ if __name__ == '__main__':
         
         if args.inference:
             cub_inference(args,expfiles)
+            
     
-    if not (args.imbalanced_dataset or args.imbalanced_task):
+    if not (args.imbalanced_dataset or args.imbalanced_task or args.imbalanced_targets):
         print('Please specify --imbalanced_dataset or --imbalanced_task')
             
         

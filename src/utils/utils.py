@@ -653,6 +653,10 @@ def nested_item(keylist, value, upto_level=None):
     Recursive method for converting into a nested dict
     Splits keys containing '.', and converts into a nested dict
     """
+#     print(keylist, value)
+#     if value == ['accuracy', 'loss', 'per_cls_stats']:
+#         import pdb; pdb.set_trace();
+
     if upto_level is None: upto_level = len(keylist)
     
     if len(keylist) == 0:
