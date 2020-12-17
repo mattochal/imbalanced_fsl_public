@@ -305,7 +305,7 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
                                'task_args.num_minority_targets',
                                'task_args.imbalance_distribution_targets')] = [train_task]
                     
-                    if len(test_tasks) > 0:
+                    if len(test_tasks) > 0:   # else if no test task is given, assume train task is the same as evaluation task 
                         variables[('task_args.test.min_num_supports', 
                                    'task_args.test.max_num_supports',
                                    'task_args.test.num_minority',
@@ -338,10 +338,11 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
                     elif model in ['maml', 'protomaml']:
                         variables['model_args.batch_size'] = [4] if model == 'maml' else [1]
                         variables['model_args.inner_loop_lr'] = [0.1]
-                        variables['model_args.num_inner_loop_steps'] = [10]
-#                         expath += '{model_args.batch_size}trainbatch_'+ \
+                        variables['model_args.num_inner_loop_steps'] = [0,1,5,10]
+                        expath += '{model_args.num_inner_loop_steps}innersteps/'
+                        #'{model_args.batch_size}trainbatch_'+ \
 #                                   '{model_args.inner_loop_lr}innerlr_' + \
-#                                   '{model_args.num_inner_loop_steps}innersteps'
+#                                   '{model_args.num_inner_loop_steps}innersteps/'
 
                     elif model in ['bmaml', 'bmaml_chaser']:
                         variables['model_args.batch_size'] = [1]
@@ -621,7 +622,7 @@ if __name__ == '__main__':
                         help='Folder with data')
     parser.add_argument('--results_folder', type=str, default='./experiments/',
                         help='Folder for saving the experiment config/scripts/logs into')
-    parser.add_argument('--imbalanced_task', type=str2bool, nargs='?', const=True, default=False,
+    parser.add_argument('--imbalanced_supports', type=str2bool, nargs='?', const=True, default=False,
                         help='Generate imbalanced support set experiments')
     parser.add_argument('--imbalanced_targets', type=str2bool, nargs='?', const=True, default=False,
                         help='Generate imbalanced target set experiments')
@@ -643,16 +644,16 @@ if __name__ == '__main__':
     
     models = [
         'protonet',
-        'relationnet',
+#         'relationnet',
 #         'matchingnet',
-        'gpshot',
+#         'gpshot',
 #         'simpleshot',
-        'baseline',
-        'baselinepp',
+#         'baseline',
+#         'baselinepp',
 #         'knn',
-        'maml',
+#         'maml',
         'protomaml',
-        'bmaml',
+#         'bmaml',
 #         'bmaml_chaser',
 #         'protodkt',
 #         'btaml',  # -- left out due to an implementation error
@@ -678,7 +679,7 @@ if __name__ == '__main__':
     ]
     
     imbalanced_tasks = [
-        (1, 9, None, 'linear', 15, 15, None, 'balanced')
+#         (1, 9, None, 'linear', 15, 15, None, 'balanced')
 #         (1, 9, None, 'random')
 #         (1, 9, None, 'linear'), 
 #         (3, 7, None, 'linear'), 
@@ -692,14 +693,14 @@ if __name__ == '__main__':
         seeds = seeds[:1]
         
         
-    if args.imbalanced_task:
+    if args.imbalanced_supports:
         # Standard meta-training
         standard_expfiles = fsl_imbalanced(args, models=models, strategies=[None], seeds=seeds, train_tasks=balanced_tasks,
-                                save=not (args.test or args.inference), expfolder='imbalanced_task/')
+                                save=not (args.test or args.inference), expfolder='imbalanced_supports/')
         # Random Shot meta-training
         randomshot_expfiles = fsl_imbalanced(args, models=models, strategies=strategies, seeds=seeds, 
                                              train_tasks=imbalanced_tasks,  save=not (args.test or args.inference), 
-                                             expfolder='imbalanced_task/')
+                                             expfolder='imbalanced_supports/')
         
         if args.test: 
             imbalanced_task_test(args, standard_expfiles)
@@ -742,7 +743,7 @@ if __name__ == '__main__':
             cub_inference(args,expfiles)
             
     
-    if not (args.imbalanced_dataset or args.imbalanced_task or args.imbalanced_targets):
-        print('Please specify --imbalanced_dataset or --imbalanced_task')
+    if not (args.imbalanced_dataset or args.imbalanced_supports or args.imbalanced_targets):
+        print('Please specify --imbalanced_dataset or --imbalanced_supports')
             
         

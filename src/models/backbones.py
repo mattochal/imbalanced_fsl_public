@@ -66,7 +66,7 @@ class Conv2d_fw(nn.Conv2d): # used in MAML to forward input with fast weight
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,padding=0, bias = True):
         super(Conv2d_fw, self).__init__(in_channels, out_channels, kernel_size, stride=stride, padding=padding, bias=bias)
         self.weight.fast = None
-        if not self.bias is None:
+        if bias:
             self.bias.fast = None
 
     def forward(self, x):
@@ -113,7 +113,6 @@ class ConvBlock(nn.Module):
         if self.maml:
             self.C      = Conv2d_fw(indim, outdim, 3, padding = padding).to(device)
             self.BN     = BatchNorm2d_fw(outdim, device).to(device)
-#             self.BN     = nn.BatchNorm2d(outdim).to(device)
         else:
             self.C      = nn.Conv2d(indim, outdim, 3, padding= padding).to(device)
             self.BN     = nn.BatchNorm2d(outdim).to(device)
