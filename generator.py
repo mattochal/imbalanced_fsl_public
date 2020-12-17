@@ -338,8 +338,8 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
                     elif model in ['maml', 'protomaml']:
                         variables['model_args.batch_size'] = [4] if model == 'maml' else [1]
                         variables['model_args.inner_loop_lr'] = [0.1]
-                        variables['model_args.num_inner_loop_steps'] = [0,1,5,10]
-                        expath += '{model_args.num_inner_loop_steps}innersteps/'
+                        variables['model_args.num_inner_loop_steps'] = [10]
+#                         expath += '{model_args.num_inner_loop_steps}innersteps/'
                         #'{model_args.batch_size}trainbatch_'+ \
 #                                   '{model_args.inner_loop_lr}innerlr_' + \
 #                                   '{model_args.num_inner_loop_steps}innersteps/'
@@ -644,17 +644,17 @@ if __name__ == '__main__':
     
     models = [
         'protonet',
-#         'relationnet',
-#         'matchingnet',
-#         'gpshot',
-#         'simpleshot',
+        'relationnet',
+        'matchingnet',
+        'gpshot',
+        'simpleshot',
 #         'baseline',
 #         'baselinepp',
 #         'knn',
-#         'maml',
+        'maml',
         'protomaml',
-#         'bmaml',
-#         'bmaml_chaser',
+        'bmaml',
+        'bmaml_chaser',
 #         'protodkt',
 #         'btaml',  # -- left out due to an implementation error
     ]
@@ -675,7 +675,7 @@ if __name__ == '__main__':
     ]
     
     balanced_tasks = [
-        (5, 5, None, 'balanced', 15, 15, None, 'balanced')
+#         (5, 5, None, 'balanced', 15, 15, None, 'balanced')
     ]
     
     imbalanced_tasks = [
@@ -713,18 +713,18 @@ if __name__ == '__main__':
     if args.imbalanced_targets:
         # Standard meta-training
         train_tasks = [
-            (5, 5, None, 'balanced', 5, 5, None, 'balanced'),
-            (5, 5, None, 'balanced', 1, 9, None, 'linear'),
-            (1, 9, None, 'linear', 5, 5, None, 'balanced'),
-            (1, 9, None, 'linear', 1, 9, None, 'linear'),
+            (5, 5, None, 'balanced', 15, 15, None, 'balanced'),
+            (5, 5, None, 'balanced', 1, 29, None, 'linear'),
+            (1, 9, None, 'linear', 15, 15, None, 'balanced'),
+            (1, 9, None, 'linear', 1, 29, None, 'linear'),
         ]
         
         test_tasks = [
-            (1, 9, None, 'linear', 5, 5, None, 'balanced')
+            (1, 9, None, 'linear', 15, 15, None, 'balanced')
         ]
         
         expfiles = fsl_imbalanced(args, models=models, strategies=[None], seeds=seeds, train_tasks=train_tasks, 
-                                  test_tasks=test_tasks, save=not(args.test or args.inference), expfolder='imbalanced_targets/')
+                                  test_tasks=test_tasks, save=not(args.test or args.inference), expfolder='imbalanced_targets2/')
         
         if args.test:
             imbalanced_target_test(args, expfiles)
