@@ -75,7 +75,7 @@ class ExperimentBuilder():
             json.dump(json.loads(str(self.args)), f, indent=2, sort_keys=True)
     
     
-    def load_from_checkpoint(self, checkpoint_name_or_path, load_model_only=False):
+    def load_from_checkpoint(self, checkpoint_name_or_path, load_model_only=False, load_backbone_only=False):
         """
         Loads the model and state of the experiment from a checkpoint file
         """
@@ -95,14 +95,21 @@ class ExperimentBuilder():
         
         print('Loading from checkpoint', filepath)
         checkpoint = torch.load(filepath, map_location=map_location)
-        state, model, performance_log = checkpoint['state'], checkpoint['model'], checkpoint['performance_log']
+        state_, model_, performance_log = checkpoint['state'], checkpoint['model'], checkpoint['performance_log']
         
-        if load_model_only:
-            self.model.load_state_dict(model)
+        if load_model_only and not load_backbone_only:
+            self.model.load_state_dict(model_)
             return 
         
-        self.state.from_dict(state)
-        self.model.load_state_dict(model)
+        elif load_backbone_only:
+            model_layers = self.model.state_dict()
+            to_load = {k:v for k,v in model_.items() if 'backbone.' in k and k in model_layers} # load only if in model
+            model_layers.update(to_load)
+            self.model.load_state_dict(model_layers)
+            return
+        
+        self.state.from_dict(state_)
+        self.model.load_state_dict(model_)
         self.ptracker.load_from_logfile(performance_log)
     
     
@@ -195,33 +202,33 @@ class ExperimentBuilder():
             checkpoint_names = sorted(checkpoint_names)
             self.args.continue_from = checkpoint_names[-1]
             print('LATEST', self.args.continue_from)
-            self.load_from_checkpoint(self.args.continue_from)
+            self.load_from_checkpoint(self.args.continue_from, load_backbone_only=self.args.load_backbone_only)
         
         elif self.args.continue_from == 'best':
             with open(os.path.join(self.checkpoint_folder,'path_to_best'),'r') as f:
                 self.args.continue_from = f.read()
             print('BEST', self.args.continue_from)
-            self.load_from_checkpoint(self.args.continue_from)
+            self.load_from_checkpoint(self.args.continue_from, load_backbone_only=self.args.load_backbone_only)
             
         elif self.args.continue_from.isdigit():
             checkpoint_name = 'epoch-{:03d}'.format(int(self.args.continue_from))
             self.args.continue_from = os.path.join(self.checkpoint_folder, checkpoint_name)
             print('EPOCH', self.args.continue_from)
-            self.load_from_checkpoint(self.args.continue_from)
+            self.load_from_checkpoint(self.args.continue_from, load_backbone_only=self.args.load_backbone_only)
             
-        else: # assume 'continue_from' contains a checkpoint filename or folder
+        else: # assume 'continue_from' contains a checkpoint folder, or if not, a filename 
             if os.path.isdir(self.args.continue_from):
                 with open(os.path.join(self.args.continue_from, 'checkpoint', 'path_to_best'), 'r') as f:
                     filename = f.read()
             
-            elif os.path.isfile(self.args.continue_from):  
+            elif os.path.isfile(self.args.continue_from):
                 filename = self.args.continue_from
                 
             else:  
                 raise Exception("Filename / experiment folder not found! Path given: {}".format(self.args.continue_from))
                 
             print('FILE', filename)
-            self.load_from_checkpoint(filename, load_model_only=True)
+            self.load_from_checkpoint(filename, load_model_only=True, load_backbone_only=self.args.load_backbone_only)
         
         return True
     
@@ -253,7 +260,7 @@ class ExperimentBuilder():
             self.evaluate_on_test()
             return
         
-        if continue_from_next_epoch:
+        if continue_from_next_epoch and not self.args.load_backbone_only:
             self.ptracker.reset_epoch_cache()
             self.state.next_epoch()
             self.model.next_epoch()

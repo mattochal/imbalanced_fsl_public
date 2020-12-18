@@ -112,8 +112,7 @@ STRATEGIES = {
     "weighted_loss": WeightedLoss,
     "focal_loss"   : FocalLoss,
     "cb_loss"      : CBLoss,
-    None           : StrategyTemplate,
-    "None"         : StrategyTemplate,
+    None           : StrategyTemplate
 }
 
 def get_main_parser(optional=None):
@@ -169,6 +168,8 @@ def get_main_parser(optional=None):
                         help="file path to json configuration file")
     parser.add_argument('--continue_from', type=str, default=None, 
                         help="Continue from a checkpoint file, epoch, or 'latest', 'best', or 'from_scratch'/None.")
+    parser.add_argument('--load_backbone_only', type=str2bool, nargs='?', const=True, default=False,
+                        help="Loads the backbone only from 'continue_from'")
     parser.add_argument('--dummy_run', type=str2bool, nargs='?', const=True, default=False, 
                         help='A dry run of the settings with a 1 epoch and validation, a reduced number of tasks, no saving')
     parser.add_argument('--conventional_split', type=str2bool, nargs='?', const=True, default=None,
