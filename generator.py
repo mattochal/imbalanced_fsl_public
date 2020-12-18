@@ -364,8 +364,8 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
                         variables['model_args.batch_size'] = [4] if model == 'maml' else [1]
                         variables['model_args.inner_loop_lr'] = [0.1]
                         variables['model_args.num_inner_loop_steps'] = [0,10]
-#                         expath += '{model_args.num_inner_loop_steps}innersteps/'
-                        #'{model_args.batch_size}trainbatch_'+ \
+                        expath += '{model_args.num_inner_loop_steps}innersteps/'
+#                         '{model_args.batch_size}trainbatch_'+ \
 #                                   '{model_args.inner_loop_lr}innerlr_' + \
 #                                   '{model_args.num_inner_loop_steps}innersteps/'
 
