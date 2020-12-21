@@ -16,7 +16,7 @@ class ProtoMaml(Maml):
         
     def init_classifier(self, supports_x, supports_y):
         """
-        Initializes the fast weights of MAML with prototype embeddings
+        Initializes the fast weights of FC layer with prototype embeddings
         """
         supports_h = self.backbone(supports_x)
         proto_h, proto_y = self.calc_prototypes(supports_h, supports_y)

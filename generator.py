@@ -264,20 +264,28 @@ def make_names(settings, way):
 
     
 def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], test_tasks=[], var_update={}, save=True, 
-                   expfolder='', pretrained_backbone=None):
+                   expfolder='', pretrained_backbone=None, slow_learning=False):
     
     n_way = 5
     dataset = 'mini'
     
-    train_setup = {
-        'num_epochs': [200],
-         'model_args.lr'              : [0.001], 
-         'model_args.lr_decay'        : [0.1],
-         'model_args.lr_decay_step'   : [100],
-        }
-    
+    if slow_learning:
+        train_setup = {
+            'num_epochs': [1000],
+             'model_args.lr'              : [0.001], 
+             'model_args.lr_decay'        : [0.1],
+             'model_args.lr_decay_step'   : [250,500,1000],
+            }
+    else:
+        train_setup = {
+            'num_epochs': [200],
+             'model_args.lr'              : [0.001], 
+             'model_args.lr_decay'        : [0.1],
+             'model_args.lr_decay_step'   : [100],
+            }
+        
     if pretrained_backbone is not None:
-        {
+        train_setup = {
         'num_epochs': [50],
          'model_args.lr'              : [0.0001], 
          'model_args.lr_decay'        : [0.1],
@@ -324,14 +332,14 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
                                'task_args.imbalance_distribution_targets')] = [train_task]
                     
                     if len(test_tasks) > 0:   # else if no test task is given, assume train task is the same as evaluation task 
-                        variables[('task_args.test.min_num_supports', 
-                                   'task_args.test.max_num_supports',
-                                   'task_args.test.num_minority',
-                                   'task_args.test.imbalance_distribution', 
-                                   'task_args.test.min_num_targets', 
-                                   'task_args.test.max_num_targets',
-                                   'task_args.test.num_minority_targets',
-                                   'task_args.test.imbalance_distribution_targets')] = test_tasks
+                        variables[('task_args.eval.min_num_supports', 
+                                   'task_args.eval.max_num_supports',
+                                   'task_args.eval.num_minority',
+                                   'task_args.eval.imbalance_distribution', 
+                                   'task_args.eval.min_num_targets', 
+                                   'task_args.eval.max_num_targets',
+                                   'task_args.eval.num_minority_targets',
+                                   'task_args.eval.imbalance_distribution_targets')] = test_tasks
                     
                     is_pretrained=''
                     if pretrained_backbone is not None:
@@ -341,8 +349,13 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
                     
                     # experiment path
                     expath = expfolder + '{dataset}/'+ is_pretrained + '{backbone}/train_on_' + train_name
-                    expath += '/{strategy}/{model}/'
+                    expath += '/{strategy}/'
 #                             '{num_epochs}epochs_{num_tasks_per_epoch}tasks/'
+                    
+                    if slow_learning:
+                        expath += '{num_epochs}epochs_{model_args.lr}lr_{model_args.lr_decay_step}step/'
+                    
+                    expath += '{model}/'
                     
                     if model in ['protonet', 'protodkt']:
 #                         variables[(
@@ -636,6 +649,8 @@ def cub_inference(args, expfiles, save=True):
                 args,
                 save=True
             )
+
+
             
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -653,6 +668,8 @@ if __name__ == '__main__':
                         help='Generate imbalanced target set experiments')
     parser.add_argument('--imbalanced_dataset', type=str2bool, nargs='?', const=True, default=False,
                         help='Generate imbalanced dataset experiments')
+    parser.add_argument('--slow_learning', type=str, nargs='?', const=True, default=False,
+                        help='If true, runs slower learning rate.')
     parser.add_argument('--load_backbone', type=str, nargs='?', const=True, default=False,
                         help='If true, loads backbone of a Baseline++ model.')
     parser.add_argument('--test', type=str2bool, nargs='?', const=True, default=False,
@@ -670,7 +687,7 @@ if __name__ == '__main__':
     args.results_folder = os.path.abspath(args.results_folder)
     
     models = [
-        'protonet',
+#         'protonet',
 #         'relationnet',
 #         'matchingnet',
 #         'gpshot',
@@ -702,11 +719,11 @@ if __name__ == '__main__':
     ]
     
     balanced_tasks = [
-#         (5, 5, None, 'balanced', 15, 15, None, 'balanced')
+        (5, 5, None, 'balanced', 15, 15, None, 'balanced')
     ]
     
     imbalanced_tasks = [
-#         (1, 9, None, 'linear', 15, 15, None, 'balanced')
+        (1, 9, None, 'linear', 15, 15, None, 'balanced')
 #         (1, 9, None, 'random')
 #         (1, 9, None, 'linear'), 
 #         (3, 7, None, 'linear'), 
@@ -733,11 +750,12 @@ if __name__ == '__main__':
         # Standard meta-training
         standard_expfiles = fsl_imbalanced(args, models=models, strategies=[None], seeds=seeds, train_tasks=balanced_tasks,
                                 save=not (args.test or args.inference), expfolder='imbalanced_supports/', 
-                                           pretrained_backbone=backbone)
+                                           pretrained_backbone=backbone, slow_learning=args.slow_learning)
         # Random Shot meta-training
         randomshot_expfiles = fsl_imbalanced(args, models=models, strategies=strategies, seeds=seeds,
                                              train_tasks=imbalanced_tasks, save=not (args.test or args.inference), 
-                                             expfolder='imbalanced_supports/', pretrained_backbone=backbone)
+                                             expfolder='imbalanced_supports/', pretrained_backbone=backbone, 
+                                             slow_learning=args.slow_learning)
         
         if args.test: 
             imbalanced_task_test(args, standard_expfiles)
@@ -762,7 +780,8 @@ if __name__ == '__main__':
         
         expfiles = fsl_imbalanced(args, models=models, strategies=[None], seeds=seeds, train_tasks=train_tasks, 
                                   test_tasks=test_tasks, save=not(args.test or args.inference), 
-                                  expfolder='imbalanced_targets2/', pretrained_backbone=backbone)
+                                  expfolder='imbalanced_targets2/', pretrained_backbone=backbone, 
+                                  slow_learning=args.slow_learning)
         
         if args.test:
             imbalanced_target_test(args, expfiles)
