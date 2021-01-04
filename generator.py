@@ -719,11 +719,11 @@ if __name__ == '__main__':
     ]
     
     balanced_tasks = [
-        (5, 5, None, 'balanced', 15, 15, None, 'balanced')
+#         (5, 5, None, 'balanced', 15, 15, None, 'balanced')
     ]
     
     imbalanced_tasks = [
-        (1, 9, None, 'linear', 15, 15, None, 'balanced')
+        (1, 9, None, 'random', 15, 15, None, 'balanced')
 #         (1, 9, None, 'random')
 #         (1, 9, None, 'linear'), 
 #         (3, 7, None, 'linear'), 
