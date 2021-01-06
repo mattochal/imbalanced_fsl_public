@@ -43,7 +43,7 @@ The framework is structured as follows:
     └── utils             # Utils, experiment builder, performance tracker, dataloader
 ```
 
-### Datasets
+### Data
 
 See ```./data/README.md```
 
@@ -80,7 +80,7 @@ python generator.py --imbalanced_dataset --inference
 More details can also be obtained through the ```--help``` command.
 
 
-### Running main program
+## Running main program
 
 To run a specific experiment setting from a configuration file:
 ```
