@@ -104,6 +104,7 @@ ____
 
 ### Contributions
 This repository contains parts of code from the following GITHUB repositories:
+
 https://github.com/wyharveychen/CloserLookFewShot/
 
 https://github.com/jakesnell/ove-polya-gamma-gp/
