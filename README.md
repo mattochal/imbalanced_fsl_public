@@ -1,4 +1,5 @@
 # Imbalanced Few-Shot Learning Framework in Pytorch
+This repository contains code for "Few-Shot Learning with Class Imbalance" [(arXiv)]().
 
 
 ### Dependecies
@@ -50,8 +51,6 @@ See ```./data/README.md```
 
 
 ## Generating Main Experiments
-
-This repository contains code for "Class-Imbalance in Few-Shot Learning".
 
 To generate the experiment scripts and files for the main experiments in the paper:
 ```
