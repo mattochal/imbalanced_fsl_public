@@ -89,15 +89,15 @@ python src/main.py --args_file <CONFIGPATH> --gpu <GPU>
 
 Arguments from the ```CONFIGPATH``` can be overwriten by arguments passed through the command line.
 
-Run ```python main.py --help``` for general help
+Run ```python src/main.py --help``` for general help
 
 For sepecific model/task/stategy arguments substitute key words and run any of the following:
 
 ```
-python main.py  --model <MODEL> --help_model
-python main.py  --task <TASK> --help_task
-python main.py  --strategy <STRATEGY> --help_stategy
-python main.py  --model <MODEL>   --task <TASK>  --task <STRATEGY>   --help_all```
+python src/main.py  --model <MODEL> --help_model
+python src/main.py  --task <TASK> --help_task
+python src/main.py  --strategy <STRATEGY> --help_stategy
+python src/main.py  --model <MODEL>   --task <TASK>  --task <STRATEGY>   --help_all```
 ```
 
 ____
