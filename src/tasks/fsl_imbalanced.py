@@ -11,16 +11,25 @@ class ImbalancedFSLTask(TaskTemplate):
     def get_parser(parser=argparse.ArgumentParser()):
         parser.add_argument('--num_classes', type=int, default=5, 
                             help="Number of classes per episode (n-way).")
+        
         parser.add_argument('--min_num_supports', type=int, default=1,
-                            help="Number of support set supports per class (min k-shot).")
+                            help="Number of support set samples per class (min k-shot).")
         parser.add_argument('--max_num_supports', type=int, default=5,
-                            help="Number of support set supports per class (max k-shot).")
+                            help="Number of support set samples per class (max k-shot).")
         parser.add_argument('--num_minority', type=float, default=1,
                             help="Fraction of classes used as minority classes (used with 'step'-imbalance distribution)")
         parser.add_argument('--imbalance_distribution', type=str, choices=IMBALANCE_DIST, default='linear',
                             help="Imbalance type, specifies how to sample supports.")
-        parser.add_argument('--num_targets', type=int, default=3, 
-                            help="Number of target supports per class in query set.")
+        
+        parser.add_argument('--min_num_targets', type=int, default=15,
+                            help="Number of target set samples per class (min k-shot).")
+        parser.add_argument('--max_num_targets', type=int, default=15,
+                            help="Number of target set samples per class (max k-shot).")
+        parser.add_argument('--num_minority_targets', type=float, default=1,
+                            help="Fraction of classes used as minority classes in target set (used with 'step'-imbalance)")
+        parser.add_argument('--imbalance_distribution_targets', type=str, choices=IMBALANCE_DIST, default='balanced',
+                            help="Imbalance type for targets, specifies how to sample targets.")
+        
         parser.add_argument('--batch_size', type=int, default=1,
                             help="Number of episodes, sampled independently, in a single batch")
         return parser
@@ -35,11 +44,17 @@ class ImbalancedFSLTask(TaskTemplate):
         """
         super().__init__(dataset, args, class_seed, sample_seed)
         self.num_classes = args.num_classes
+        
         self.min_num_supports = args.min_num_supports
         self.max_num_supports = args.max_num_supports
         self.num_minority = args.num_minority
         self.imbalance_distribution = args.imbalance_distribution
-        self.num_targets = args.num_targets
+        
+        self.min_num_targets = args.min_num_targets
+        self.max_num_targets = args.max_num_targets
+        self.num_minority_targets = args.num_minority_targets
+        self.imbalance_distribution_targets = args.imbalance_distribution_targets
+        
         self.batch_size = args.batch_size
     
     def __len__(self):
@@ -54,8 +69,11 @@ class ImbalancedFSLTask(TaskTemplate):
             rng = np.random.RandomState(self.class_seed)
             total_classes = self.dataset.get_num_classes()
             selected_classes = rng.permutation(total_classes)[:self.num_classes]
+            
             num_supports = get_num_samples_per_class(self.imbalance_distribution, self.num_classes, self.min_num_supports, 
                                                      self.max_num_supports, self.num_minority, rng)
+            num_targets = get_num_samples_per_class(self.imbalance_distribution_targets, self.num_classes, self.min_num_targets, 
+                                                     self.max_num_targets, self.num_minority_targets, rng)
             
             supports_x = []
             supports_y = []
@@ -69,11 +87,11 @@ class ImbalancedFSLTask(TaskTemplate):
                 img_idxs = rng.permutation(img_idxs)
                 
                 supports_x.extend( img_idxs[:num_supports[lbl]]  ) 
-                targets_x.extend(  img_idxs[num_supports[lbl]: num_supports[lbl] + self.num_targets] )
+                targets_x.extend(  img_idxs[num_supports[lbl]: num_supports[lbl] + num_targets[lbl]] )
                 
                 supports_y.extend([lbl] * num_supports[lbl])
-                targets_y.extend([lbl] * self.num_targets)
-                    
+                targets_y.extend([lbl] * num_targets[lbl])
+            
             support_seeds = rng.randint(0, 999999999, len(supports_y))
             target_seeds = rng.randint(0, 999999999, len(targets_y))
             supports_y = zip(supports_y, support_seeds)

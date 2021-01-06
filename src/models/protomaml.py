@@ -16,7 +16,7 @@ class ProtoMaml(Maml):
         
     def init_classifier(self, supports_x, supports_y):
         """
-        Initializes the fast weights of MAML with a function of prototypes
+        Initializes the fast weights of FC layer with prototype embeddings
         """
         supports_h = self.backbone(supports_x)
         proto_h, proto_y = self.calc_prototypes(supports_h, supports_y)
@@ -38,7 +38,7 @@ class ProtoMaml(Maml):
         self.zero_grad()
         
         (support_x, support_y) = self.strategy.update_support_set(support_set)
-        self.init_classifier(support_x, support_y)  # MAML does not have this line
+        self.init_classifier(support_x, support_y)  # difference with MAML
         
         for n_step in range(self.num_steps):
             support_h = self.backbone.forward(support_x)

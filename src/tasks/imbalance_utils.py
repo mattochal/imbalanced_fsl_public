@@ -1,19 +1,19 @@
 import numpy as np
 
 
-IMBALANCE_DIST=['linear', '__linear', 'step', '__step', 'random', 'random_step', 'random_capped', 
+IMBALANCE_DIST=['linear', 'shuffled_linear', 'step', 'shuffled_step', 'random', 'random_step', 'random_capped', 
                 'constant_controlled', 'balanced']
     
 
 def get_num_samples_per_class(imbalance_distribution, num_classes, min_num_samples, max_num_samples, num_minority, rng):
     
     # Linear distribution of k-shots
-    if imbalance_distribution in ['linear', None, '__linear']:
+    if imbalance_distribution in ['linear', None, 'shuffled_linear']:
         num_samples = np.linspace(min_num_samples-0.49, max_num_samples+0.49, num_classes)
         num_samples = np.around(num_samples).astype(int) # round to nearest int
 
     # Step imbalance, controlled by num_minority
-    elif imbalance_distribution in ['step', '__step']:
+    elif imbalance_distribution in ['step', 'shuffled_step']:
         num_minority = int(num_minority * num_classes)
         num_samples = np.empty(num_classes, dtype=int)
         num_samples[:num_minority] = min_num_samples
@@ -61,7 +61,7 @@ def get_num_samples_per_class(imbalance_distribution, num_classes, min_num_sampl
     else:
         raise Exception("Imbalance distribution not found: {}".format(imbalance_distribution))
     
-    if imbalance_distribution in ['__linear', '__step']:
+    if imbalance_distribution in ['shuffled_linear', 'shuffled_step']:
         np.random.shuffle(num_samples)
     
     return num_samples
