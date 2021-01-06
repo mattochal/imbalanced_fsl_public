@@ -100,13 +100,20 @@ python main.py  --strategy <STRATEGY> --help_stategy
 python main.py  --model <MODEL>   --task <TASK>  --task <STRATEGY>   --help_all```
 ```
 
+____
 
 ### Contributions
 This repository contains parts of code from the following GITHUB repositories:
 https://github.com/wyharveychen/CloserLookFewShot/
+
 https://github.com/jakesnell/ove-polya-gamma-gp/
+
 https://github.com/BayesWatch/deep-kernel-transfer/
+
 https://github.com/haebeom-lee/l2b 
+
 https://github.com/katerakelly/pytorch-maml 
+
 https://github.com/dragen1860/MAML-Pytorch
+
 https://github.com/cnguyen10/few_shot_meta_learning
