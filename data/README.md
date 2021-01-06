@@ -1,38 +1,19 @@
 # Dataset Instructions
 
-*Automatic download and dataset creation hidden due to anonymity*
-
-All dataset files should have the following data structure:
+Our framework reads pickle (```.pkl```) dataset files with the following structure:
 
 ```
 {
-    "image_data": <array of shape (n_total, 84, 84, 3) >,
-    "class_dict": <dict>
+    "image_data": <array of shape (n, 84, 84, 3) >,
+    "class_dict": <dict with a class name as a key, and a list of corresponding image indexes as value>
 }
 ```
-where `n` is the total number of images, and `<dict>` with keys representing class names, and values indicating indices of corresponding of class images in `image_data`.
+where `n` is the total number of images in dataset.
 
-### MiniImageNet
-MiniImageNet should have the following three files 
-```
-mini-cache-train.pkl
-mini-cache-test.pkl
-mini-cache-val.pkl
-```
-These should be placed in `./data/mini/`
+You can create the dataset files from a subdirectory structure using ```create_cache_from_folders.py``` (or write your own method to create the pickle files). 
 
-### CUB-200 2011
-CUB should be the following files placed in `./data/cub/`
-```
-cub-cache-train.pkl
-cub-cache-test.pkl
-cub-cache-val.pkl
-```
-
-
-## Create from class subdirectory stracture
-
-You can also create the files from class substracture, containing images in classes for each of the dataset splits: train, val and test. Images must be placed under the following directory structure in `data/` folder of the repository:
+## Create from class subdirectory structure
+The images should be contained in class subfolders, and the class subfolders contained in: ```train/```, ```val/``` and ```test/``` folders, i.e. the following directory structure should be located inside ```./data/```:
 ```
 .<DATASET>/
 └── raw/
@@ -69,9 +50,36 @@ You can also create the files from class substracture, containing images in clas
          |   ...
          ...
 ```
-where `<DATASET>` is `mini` or `cub`, and classes and images can have arbitary names, images can have any of the following extentions: '.jpg', '.jpeg', '.gif', '.png', '.JPEG' 
+where `<DATASET>` is `mini` or `cub`. Classes and images can have arbitary names. Accepted extentions: '.jpg', '.jpeg', '.gif', '.png', '.JPEG' 
 
-To run
+To create dataset from the subdirectories run:
 ```
 create_cache_from_folders.py `<DATASET>`
 ```
+
+
+### MiniImageNet
+
+MiniImageNet can be downloaded and created using: https://github.com/yaoyao-liu/mini-imagenet-tools 
+
+To run main experiments, `./data/mini/` should contain the following files:
+```
+mini-cache-train.pkl
+mini-cache-test.pkl
+mini-cache-val.pkl
+```
+
+### CUB-200 2011
+
+[Download from official source](http://www.vision.caltech.edu/visipedia/CUB-200-2011.html)
+
+Randomly select 50 classes for testing, and arbirary split the remaining classes for validation and training.
+
+To run meta-dataset inference experiments, `./data/cub/` should contain the following files:
+```
+cub-cache-train.pkl
+cub-cache-test.pkl
+cub-cache-val.pkl
+```
+
+
