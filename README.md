@@ -55,7 +55,7 @@ This repository contains code for "Class-Imbalance in Few-Shot Learning".
 
 To generate the experiment scripts and files for the main experiments in the paper:
 ```
-python generator.py --imbalanced_task
+python generator.py --imbalanced_supports
 python generator.py --imbalanced_dataset
 ```
 Add ```--minimal``` flag to generate a reduced subset of experiments.
@@ -64,12 +64,12 @@ Add ```--gpu <GPU>``` to specify the GPU ID or ```cpu```
 
 To generate the evaluation scripts for imbalanced support set:
 ```
-python generator.py --imbalanced_task --test
+python generator.py --imbalanced_supports --test
 ```
 
 For ROS/ROS+ inference on imbalanced support sets run:
 ```
-python generator.py --imbalanced_task --inference
+python generator.py --imbalanced_supports --inference
 ```
 
 For CUB inference on imbalanced datasets run:
