@@ -1,5 +1,5 @@
 # Imbalanced Few-Shot Learning Framework in Pytorch
-This repository contains code for "Few-Shot Learning with Class Imbalance" [(arXiv)]().
+This repository contains code for "Few-Shot Learning with Class Imbalance" [(arXiv)](http://arxiv.org/abs/2101.02523).
 
 
 ### Dependecies
