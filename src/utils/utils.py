@@ -48,7 +48,7 @@ from models.matchingnet import MatchingNet
 from models.baseline import Baseline
 from models.baselinepp import BaselinePP
 from models.maml import Maml
-from models.gpshot import GPShot
+from models.dkt import DKT
 from models.simpleshot import SimpleShot
 from models.protomaml import ProtoMaml
 from models.bmaml import BayesianMAML
@@ -56,6 +56,7 @@ from models.bmaml_chaser import BayesianMAMLChaser
 from models.btaml import BayesianTAML
 from models.knn import KNN
 from models.protodkt import ProtoDKT
+# from models.relationdkt import RelationDKT
 
 # Imbalance Strategies
 from strategies.ros import ROS
@@ -84,9 +85,10 @@ MODELS = {
     "baseline"    : Baseline,        
     "baselinepp"  : BaselinePP,    
     "maml"        : Maml,                       
-    "gpshot"      : GPShot,
+    "gpshot"      : DKT,                   
+    "dkt"         : DKT,
     "protodkt"    : ProtoDKT,
-    "proto_dkt"   : ProtoDKT,
+#     "relationdkt" : RelationDKT,
     "simpleshot"  : SimpleShot,
     "protomaml"   : ProtoMaml,
     "bmaml"       : BayesianMAML,
@@ -483,7 +485,7 @@ def get_model(backbone, tasks, datasets, stategy, args, device):
     if model_name not in MODELS:
         raise Exception("Model {} does not exist".format(model_name))
 
-    if model_name in ["baseline", "baselinepp", "maml", "gpshot", "protomaml", "knn", "simpleshot",
+    if model_name in ["baseline", "baselinepp", "maml", "gpshot", "dkt", "protomaml", "knn", "simpleshot",
                      "bmaml", "bmaml_chaser", "btaml", "btaml_star", "protodkt", "proto_dkt"]:
         output_dims = dict()
         for s in ["train", "val", "test"]:

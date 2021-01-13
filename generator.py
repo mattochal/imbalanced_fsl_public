@@ -660,6 +660,8 @@ if __name__ == '__main__':
                              'and no mobel saving (useful for debugging)')
     parser.add_argument('--data_path', type=str, default='/media/disk2/mateusz/data/pkl/',
                         help='Folder with data')
+    parser.add_argument('--models', type=str, nargs="*", default=[],
+                        help='Run selected models')
     parser.add_argument('--results_folder', type=str, default='./experiments/',
                         help='Folder for saving the experiment config/scripts/logs into')
     parser.add_argument('--imbalanced_supports', type=str2bool, nargs='?', const=True, default=False,
@@ -686,22 +688,25 @@ if __name__ == '__main__':
     
     args.results_folder = os.path.abspath(args.results_folder)
     
-    models = [
-#         'protonet',
-#         'relationnet',
-#         'matchingnet',
-#         'gpshot',
-#         'simpleshot',
-#         'baseline',
-#         'baselinepp',
-#         'knn',
-#         'maml',
-        'protomaml',
-#         'bmaml',
-#         'bmaml_chaser',
-#         'protodkt',
-#         'btaml',  # -- left out due to an implementation error
-    ]
+    if args.models is None or len(args.models) == 0:
+        models = [
+    #         'protonet',
+    #         'relationnet',
+    #         'matchingnet',
+#             'dkt',
+            'simpleshot',
+    #         'baseline',
+    #         'baselinepp',
+    #         'knn',
+    #         'maml',
+    #         'protomaml',
+    #         'bmaml',
+    #         'bmaml_chaser',
+    #         'protodkt',
+    #         'btaml',  # -- left out due to an implementation error
+        ]
+    else:
+        models = args.models
     
     strategies = [
         None,
@@ -736,6 +741,7 @@ if __name__ == '__main__':
         strategies = strategies[:2]
         seeds = seeds[:1]
     
+    
     backbone = None
     if args.load_backbone:
         backbone_files = fsl_imbalanced(args, models=['baselinepp'], strategies=[None], seeds=seeds, train_tasks=[
@@ -765,6 +771,7 @@ if __name__ == '__main__':
             strategy_inference(args, standard_expfiles)
             strategy_inference(args, randomshot_expfiles)
     
+    
     if args.imbalanced_targets:
         # Standard meta-training
         train_tasks = [
@@ -789,6 +796,16 @@ if __name__ == '__main__':
         if args.inference:
             print('Strategy inference for imbalnaced target set not yet implemented.')
     
+    
+#     if tailed_dataset:
+#         expfiles = imbalanced_dataset(args, models=models, seeds=seeds, save=not (args.test or args.inference))
+        
+#         if args.test:
+#             print('Balanced task testing is performed automatically after training. Use --inference to evaluate on CUB.')
+        
+#         if args.inference:
+#             cub_inference(args,expfiles)
+        
     
     if args.imbalanced_dataset:
         expfiles = imbalanced_dataset(args, models=models, seeds=seeds, save=not (args.test or args.inference))
