@@ -20,7 +20,7 @@ import random
 import argparse
 
 
-class RelationDKT(ProtoNet):
+class RelationDKT(ModelTemplate):
     
     KERNEL_TYPES = ['bncossim', 'linear', 'rbf', 'matern', 'poli1', 'poli2', 'cossim', 'bncossim']
     
@@ -29,7 +29,7 @@ class RelationDKT(ProtoNet):
         """
         returns a parser for the given model. Can also return a subparser
         """
-        parser.add_argument('--kernel_type', type=str, choices=RelationDKT.KERNEL_TYPES, default='bncossim',
+        parser.add_argument('--kernel_type', type=str, choices=RelationDKT.KERNEL_TYPES, default='matern',
                            help='kernel type')
         parser.add_argument('--laplace', type=bool, default=False,
                            help='use laplace approximation during evaluation')
@@ -46,7 +46,7 @@ class RelationDKT(ProtoNet):
         self.kernel_type=self.args.kernel_type
         self.laplace=self.args.laplace
         self.output_dim = self.args.output_dim
-        self.normalize = (self.kernel_type in ['cossim', 'bncossim'])
+        self.normalize = True #(self.kernel_type in ['cossim', 'bncossim'])
         
     def setup_model(self):
 #         self.relation_module = RelationModule(self.backbone.final_feat_dim, 8, sigmoid=False).to(self.device)
@@ -55,34 +55,23 @@ class RelationDKT(ProtoNet):
             latent_size = np.prod(self.backbone.final_feat_dim)
             self.backbone.trunk.add_module("bn_out", nn.BatchNorm1d(latent_size).to(self.device))
         
+        train_x = torch.ones(100, 64).to(self.device)
+        train_y = torch.ones(100).to(self.device)
         self.likelihood = gpytorch.likelihoods.GaussianLikelihood().to(self.device)
-        self.gpmodel = ExactGPLayer(
-            train_x=torch.ones(100, 64).to(self.device), 
-            train_y=torch.ones(100).to(self.device), 
-            likelihood=self.likelihood,
-            kernel=self.kernel_type
-        ).to(self.device)
+        self.gpmodel = ExactGPLayer(train_x=train_x, train_y=train_y, likelihood=self.likelihood, 
+                                    kernel=self.kernel_type).to(self.device)
         self.loss_fn = gpytorch.mlls.ExactMarginalLogLikelihood(self.likelihood, self.gpmodel).to(self.device)
         
-        for param in self.likelihood.parameters():
-            param.data.normal_(0.0, 0.01)
-        
-        params = [
+        self.optimizer = torch.optim.Adam([
              {'params': self.backbone.parameters(), 'lr': self.args.lr},
 #              {'params': self.relation_module.parameters(), 'lr': self.args.lr}
              {'params': self.gpmodel.parameters(), 'lr': self.args.gpmodel_lr},
-        ]
-        
-        self.optimizer = torch.optim.Adam(params)
+        ])
         self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, 
                                                             step_size=self.args.lr_decay_step, 
                                                             gamma=self.args.lr_decay)
     
     def construct_pairs(self, proto_h, targets_h):
-#         proto_h  =  proto_h.view(-1, *self.backbone.final_feat_dim)
-#         targets_h = targets_h.view(-1, *self.backbone.final_feat_dim)
-        
-#         import pdb; pdb.set_trace()
         n_proto  = len(proto_h) # n_way
         n_targets = len(targets_h) # n_query * n_way
         
@@ -94,8 +83,23 @@ class RelationDKT(ProtoNet):
         extend_final_feat_dim = self.backbone.final_feat_dim
         extend_final_feat_dim *= 2
         relation_pairs = torch.cat((proto_h_ext, targets_h_ext),2).view(-1, extend_final_feat_dim)
+        if self.normalize: relation_pairs = F.normalize(relation_pairs, p=2, dim=1)
         return relation_pairs
     
+    def calc_prototypes(self, h, y):
+        """
+        Computes prototypes
+        """
+        unique_labels = torch.unique(y)
+        proto_h = []
+        for label in unique_labels:
+            proto_h.append(h[y==label].mean(0))
+        return proto_h, unique_labels
+    
+    def forward(self, x):
+        h = self.backbone.forward(x)
+#         if self.normalize: h = F.normalize(h, p=2, dim=1)
+        return h
     
     def meta_train(self, task, ptracker):
         self.mode='train'
@@ -121,96 +125,116 @@ class RelationDKT(ProtoNet):
                 all_x = support_x
                 all_y = support_y
             
-            all_h = self.backbone.forward(all_x)
-            all_h, all_y = self.strategy.update_support_features((all_h, all_y))
+            all_h = self.forward(all_x)
+            all_y_onehots = uu.onehot(all_y, fill_with=-1, dim=self.output_dim[self.mode])
             
             # Construct prototypes
             proto_h, proto_y = self.calc_prototypes(all_h, all_y)
             proto_h = torch.stack(proto_h)
-            proto_n = len(proto_h)
             
             # Construct pairs
             pairs_h = self.construct_pairs(proto_h, all_h)
-#             pairs_h = self.relation_module(pairs_h) if self.reduce_pair_features else pairs_h
-            pairs_y_onehot = Variable(uu.onehot(all_y).float().to(self.device)).view(-1).squeeze()
+            pairs_h = self.relation_module(pairs_h) if self.reduce_pair_features else pairs_h
+            pairs_y_onehot = all_y_onehots.view(-1)
             
             self.gpmodel.set_train_data(inputs=pairs_h, targets=pairs_y_onehot, strict=False)
-            self.optimizer.zero_grad()
             output = self.gpmodel(*self.gpmodel.train_inputs)
             loss = -self.loss_fn(output, self.gpmodel.train_targets)
+            
+            self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
-            
             
             if len(target_x) > 0:
                 with torch.no_grad():
                     self.gpmodel.eval()
                     self.likelihood.eval()
                     self.backbone.eval()
-                    
-                    support_h = self.backbone.forward(support_x).detach()
-                    target_h = self.backbone.forward(target_x).detach()
+
+                    support_h = self.forward(support_x)
+                    target_h = self.forward(target_x)
                     support_h, support_y = self.strategy.update_support_features((support_h, support_y))
-                    
+
                     # Construct prototypes from supports 
                     s_proto_h, s_proto_y = self.calc_prototypes(support_h, support_y)
                     s_proto_h = torch.stack(s_proto_h)
                     
-#                     import pdb; pdb.set_trace()
+                    # Construct pairs between prototypes from supports and supports
+                    ss_pairs_h = self.construct_pairs(s_proto_h, support_h)
+                    ss_pairs_h = self.relation_module(ss_pairs_h) if self.reduce_pair_features else ss_pairs_h
+                    ss_pairs_y_onehot = uu.onehot(support_y, fill_with=-1, dim=self.output_dim[self.mode]).view(-1)
+        
+                    # Set train data
+                    self.gpmodel.set_train_data(inputs=ss_pairs_h, targets=ss_pairs_y_onehot, strict=False)
+                
                     # Construct pairs between prototypes from supports and targets
                     st_pairs_h = self.construct_pairs(s_proto_h, target_h)
-#                     pairs_h = self.relation_module(pairs_h) if self.reduce_pair_features else pairs_h
-                    st_pairs_y_onehot = Variable(uu.onehot(target_y).float().to(self.device)).view(-1).squeeze()
+                    st_pairs_h = self.relation_module(st_pairs_h) if self.reduce_pair_features else st_pairs_h
+                    st_pairs_y_onehot = uu.onehot(target_y, fill_with=-1, dim=self.output_dim[self.mode]).view(-1)
                     
-#                     self.gpmodel.set_train_data(inputs=st_pairs_h, targets=st_pairs_y_onehot, strict=False)
-#                     self.gpmodel.eval()
+                    # Eval performance
                     output = self.gpmodel(st_pairs_h)
-                    prediction = self.likelihood(output)
-#                     loss_targets = self.loss_fn(output, self.gpmodel.train_targets)
-#                     import pdb; pdb.set_trace()
-                    
-                    predictions_list = list()
-                    for gaussian in prediction:
-                        predictions_list.append(torch.sigmoid(gaussian.mean))
-                    
-                    predictions_list = torch.stack(predictions_list).view(-1, proto_n)
-                    pred_y = predictions_list.argmax(1)
-                    
                     t_loss = -self.loss_fn(output, st_pairs_y_onehot)
+                    prediction = torch.sigmoid(self.likelihood(output).mean)
+                    pred_y = prediction.view(-1, self.output_dim[self.mode]).argmax(1)
+#                     print(prediction.view(-1, proto_n)[:3], pred_y[:3])
+#                     import pdb; pdb.set_trace()
                     
                     ptracker.add_task_performance(
                         pred_y.detach().cpu().numpy(),
                         target_y.detach().cpu().numpy(),
                         t_loss.detach().cpu().numpy())
-            
-            
+    
+    
+    def net_train(self, support_set):
+        self.gpmodel.eval()
+        self.likelihood.eval()
+        self.backbone.eval()
+
+        support_x, support_y = support_set
+        support_h = self.forward(support_x)
+        support_h, support_y = self.strategy.update_support_features((support_h, support_y))
+
+        # Construct prototypes from supports 
+        s_proto_h, s_proto_y = self.calc_prototypes(support_h, support_y)
+        s_proto_h = torch.stack(s_proto_h)
+
+        # Construct pairs between prototypes from supports and supports
+        ss_pairs_h = self.construct_pairs(s_proto_h, support_h)
+        ss_pairs_h = self.relation_module(ss_pairs_h) if self.reduce_pair_features else ss_pairs_h
+        ss_pairs_y_onehot = uu.onehot(support_y, fill_with=-1, dim=self.output_dim[self.mode]).view(-1)
+
+        # Set train data
+        self.gpmodel.set_train_data(inputs=ss_pairs_h, targets=ss_pairs_y_onehot, strict=False)
+        self.s_proto_h = s_proto_h
+    
+    
     def net_eval(self, target_set, ptracker):
         if len(target_set[0]) == 0: return torch.tensor(0.).to(self.device)
         
-        targets_x, targets_y = target_set
-        targets_h = self.backbone(targets_x)
-        proto_h, proto_y = self.get_prototypes()
-        
-        relation_pairs = self.construct_pairs(proto_h, targets_h)
-        
-        n_way = len(proto_y)
-        scores = self.relation_module(relation_pairs)
-        scores = scores.view(-1, n_way)
-        
-        if self.loss_type == 'mse':
-            targets_y_onehot = Variable(uu.onehot(targets_y).float().to(self.device))
-            loss = self.loss_fn(scores, targets_y_onehot)
-        else:
-            loss = self.strategy.apply_outer_loss(self.loss_fn, scores, targets_y)
-        
-        _, pred_y = torch.max(scores, 1)
-        
-        ptracker.add_task_performance(
-            pred_y.detach().cpu().numpy(),
-            targets_y.detach().cpu().numpy(),
-            loss.detach().cpu().numpy())
-        
-        return loss
+        with torch.no_grad():
+            self.gpmodel.eval()
+            self.likelihood.eval()
+            self.backbone.eval()
+
+            target_x, target_y = target_set
+            target_h = self.forward(target_x)
+
+            # Construct pairs between prototypes from supports and targets
+            st_pairs_h = self.construct_pairs(self.s_proto_h, target_h)
+            st_pairs_h = self.relation_module(st_pairs_h) if self.reduce_pair_features else st_pairs_h
+            st_pairs_y_onehot = uu.onehot(target_y, fill_with=-1, dim=self.output_dim[self.mode]).view(-1)
+            
+            # Eval performance
+            output = self.gpmodel(st_pairs_h)
+            t_loss = -self.loss_fn(output, st_pairs_y_onehot)
+            prediction = torch.sigmoid(self.likelihood(output).mean)
+            pred_y = prediction.view(-1, self.output_dim[self.mode]).argmax(1)
+
+            ptracker.add_task_performance(
+                pred_y.detach().cpu().numpy(),
+                target_y.detach().cpu().numpy(),
+                t_loss.detach().cpu().numpy())
     
     
 class RelationConvBlock(nn.Module):
@@ -274,7 +298,7 @@ class ExactGPLayer(gpytorch.models.ExactGP):
     def __init__(self, train_x, train_y, likelihood, kernel='linear'):
         #Set the likelihood noise and enable/disable learning
         likelihood.noise_covar.raw_noise.requires_grad = False
-        likelihood.noise_covar.noise = torch.tensor(0.1)
+        likelihood.noise_covar.noise = torch.tensor(0.2)
         super().__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.ConstantMean()
         

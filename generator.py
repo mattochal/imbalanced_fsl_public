@@ -375,11 +375,11 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
 
                     elif model in ['maml', 'protomaml']:
                         variables['model_args.batch_size'] = [4] if model == 'maml' else [1]
-                        variables['model_args.inner_loop_lr'] = [0.1]
-                        variables['model_args.num_inner_loop_steps'] = [0,10]
-                        expath += '{model_args.num_inner_loop_steps}innersteps/'
+                        variables['model_args.inner_loop_lr'] = [0.005,0.01]
+                        variables['model_args.num_inner_loop_steps'] = [5,10]
+                        expath += '{model_args.num_inner_loop_steps}innersteps_' +\
+                                  '{model_args.inner_loop_lr}innerlr/'
 #                         '{model_args.batch_size}trainbatch_'+ \
-#                                   '{model_args.inner_loop_lr}innerlr_' + \
 #                                   '{model_args.num_inner_loop_steps}innersteps/'
 
                     elif model in ['bmaml', 'bmaml_chaser']:
@@ -694,12 +694,12 @@ if __name__ == '__main__':
     #         'relationnet',
     #         'matchingnet',
 #             'dkt',
-            'simpleshot',
-    #         'baseline',
-    #         'baselinepp',
+#             'simpleshot',
+#             'baseline',
+#             'baselinepp',
     #         'knn',
     #         'maml',
-    #         'protomaml',
+            'protomaml',
     #         'bmaml',
     #         'bmaml_chaser',
     #         'protodkt',
@@ -724,11 +724,11 @@ if __name__ == '__main__':
     ]
     
     balanced_tasks = [
-#         (5, 5, None, 'balanced', 15, 15, None, 'balanced')
+        (5, 5, None, 'balanced', 15, 15, None, 'balanced')
     ]
     
     imbalanced_tasks = [
-        (1, 9, None, 'random', 15, 15, None, 'balanced')
+#         (1, 9, None, 'random', 15, 15, None, 'balanced')
 #         (1, 9, None, 'random')
 #         (1, 9, None, 'linear'), 
 #         (3, 7, None, 'linear'), 

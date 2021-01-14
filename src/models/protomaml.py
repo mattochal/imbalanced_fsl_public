@@ -21,6 +21,8 @@ class ProtoMaml(Maml):
         supports_h = self.backbone(supports_x)
         proto_h, proto_y = self.calc_prototypes(supports_h, supports_y)
         proto_h = torch.stack(proto_h, 0)[proto_y]
+#         import pdb; pdb.set_trace()
+        proto_h = F.normalize(proto_h, p=2, dim=1)
         self.classifier.weight.data = 2 * nn.Parameter(proto_h, requires_grad=True).to(self.device)
         self.classifier.bias.data = - nn.Parameter(torch.square(proto_h.norm(p=2,dim=1)), requires_grad=True).to(self.device)
     
