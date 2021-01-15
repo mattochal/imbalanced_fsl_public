@@ -2,7 +2,7 @@ import numpy as np
 
 
 IMBALANCE_DIST=['linear', 'shuffled_linear', 'step', 'shuffled_step', 'random', 'random_step', 'random_capped', 
-                'constant_controlled', 'balanced']
+                'constant_controlled', 'balanced', 'longtail']
     
 
 def get_num_samples_per_class(imbalance_distribution, num_classes, min_num_samples, max_num_samples, num_minority, rng):
@@ -57,6 +57,26 @@ def get_num_samples_per_class(imbalance_distribution, num_classes, min_num_sampl
     elif imbalance_distribution == 'balanced':
         mean_samples = int((min_num_samples+max_num_samples)/2)
         num_samples = np.ones(num_classes, dtype=int) * mean_samples
+    
+    # Long-tail distribution, where min_minority is used as the exponential for power law distribution
+    elif imbalance_distribution == 'longtail':
+        cls_n = 800
+        max_n = 1000 # samples per class
+        min_n = 20 # samples per class
+        
+        px,py = (1./num_classes, min_num_samples/max_num_samples)
+        qx,qy = (1., 1.)
+        
+        # power law distribution: y = ax^b + c
+        # where y is the fraction of samples per class, and x is the class id.
+        b = num_minority
+        c = py
+        a = (qy - c)/(qx**b)
+        
+        x = np.linspace(0,1,num_classes)
+        y = (a*(x**b) + c)
+        plt.plot(x*num_classes,y*max_num_samples)
+        num_samples = (y * max_num_samples).astype(np.int32)
         
     else:
         raise Exception("Imbalance distribution not found: {}".format(imbalance_distribution))

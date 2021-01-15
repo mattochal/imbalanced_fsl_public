@@ -375,8 +375,8 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
 
                     elif model in ['maml', 'protomaml']:
                         variables['model_args.batch_size'] = [4] if model == 'maml' else [1]
-                        variables['model_args.inner_loop_lr'] = [0.005,0.01]
-                        variables['model_args.num_inner_loop_steps'] = [5,10]
+                        variables['model_args.inner_loop_lr'] = [0.01, 0.1] if model == 'maml' else [0.005]
+                        variables['model_args.num_inner_loop_steps'] = [5,10] if model == 'maml' else [5]
                         expath += '{model_args.num_inner_loop_steps}innersteps_' +\
                                   '{model_args.inner_loop_lr}innerlr/'
 #                         '{model_args.batch_size}trainbatch_'+ \
@@ -398,9 +398,9 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
 #                         expath += '/'
                         
                     elif model == 'btaml':
-                        variables['backbone_channel_dim'] = [64]
+                        variables['backbone_channel_dim'] = [32,64]
                         variables['model_args.lr'] = [0.0001]
-                        variables[('model_args.approx','model_args.approx_until')] = [(True,50),(True,25),(False,0)]
+                        variables[('model_args.approx','model_args.approx_until')] = [(True,0)]
                         variables['model_args.batch_size'] = [4]
                         variables['model_args.inner_loop_lr'] = [0.1]
                         variables['model_args.num_inner_loop_steps'] = [10]
@@ -408,9 +408,10 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
                                    'model_args.omega_on',
                                    'model_args.gamma_on',
                                    'model_args.z_on')] = [(True, True, True, True)]
-                        expath += "{model_args.alpha_on}a_{model_args.omega_on}o_" + \
-                                   "{model_args.gamma_on}g_" + \
-                                   "{model_args.z_on}z_{model_args.approx_until}till/"
+                        expath += '{backbone_channel_dim}backbonedims/'
+#                         expath += "{model_args.alpha_on}a_{model_args.omega_on}o_" + \
+#                                    "{model_args.gamma_on}g_" + \
+#                                    "{model_args.z_on}z_{model_args.approx_until}till/"
 #                         expath += '{model_args.batch_size}trainbatch_'+ \
 #                                   '{model_args.inner_loop_lr}innerlr_' + \
 #                                   '{model_args.num_inner_loop_steps}innersteps/'
@@ -619,6 +620,53 @@ def imbalanced_dataset(args, models=[], seeds=[], save=True):
             ))
     return experiement_files
 
+
+def longtail_dataset(args, models=[], seeds=[], save=True):
+    
+    # meta-training dataset imbalance settings
+    imbalance_settings = [
+        (300, 300, None, 'balanced'),
+        (20 , 1000, 12,   'longtail'),
+    ]
+    
+    strategies=[None]
+    train_tasks=[(5, 5, None, 'balanced', 15, 15, None, 'balanced')]
+    var_update = {'num_epochs': [200], 'num_tasks_per_epoch': [250]}
+    
+    is_baseline = lambda x: x in ['baseline', 'baselinepp', 'knn']
+    
+    experiement_files = []
+    for experiment in fsl_imbalanced(args, models=models, strategies=strategies, seeds=seeds, var_update=var_update,
+                          train_tasks=train_tasks, save=False):
+        
+        script, script_path, config, config_path = experiment
+        default_config = get_default_config()
+        default_config = substitute_hyperparameters(default_config, config)
+        model = default_config['model']
+        
+        for setting in imbalance_settings:
+            min_s, max_s, minor, dist  = setting
+            
+            variables = {
+                'dataset_args.train.min_num_samples'       :[min_s],
+                'dataset_args.train.max_num_samples'       :[max_s],
+                'dataset_args.train.num_minority'          :[minor],
+                'dataset_args.train.imbalance_distribution':[dist],
+                'conventional_split'                       :[is_baseline(model)],
+                'conventional_split_from_train_only'       :[is_baseline(model)]
+            }
+            
+            expath = default_config['experiment_name']
+            
+            experiement_files.extend(generate_experiments(
+                expath, 
+                variables, 
+                default_config,
+                args,
+                save=save
+            ))
+    return experiement_files
+
             
 def cub_inference(args, expfiles, save=True):
     
@@ -670,6 +718,8 @@ if __name__ == '__main__':
                         help='Generate imbalanced target set experiments')
     parser.add_argument('--imbalanced_dataset', type=str2bool, nargs='?', const=True, default=False,
                         help='Generate imbalanced dataset experiments')
+    parser.add_argument('--tailed_dataset', type=str2bool, nargs='?', const=True, default=False,
+                        help='Generate imbalanced dataset experiments with long-tail distribution')
     parser.add_argument('--slow_learning', type=str, nargs='?', const=True, default=False,
                         help='If true, runs slower learning rate.')
     parser.add_argument('--load_backbone', type=str, nargs='?', const=True, default=False,
@@ -690,20 +740,21 @@ if __name__ == '__main__':
     
     if args.models is None or len(args.models) == 0:
         models = [
-    #         'protonet',
-    #         'relationnet',
-    #         'matchingnet',
-#             'dkt',
-#             'simpleshot',
-#             'baseline',
-#             'baselinepp',
-    #         'knn',
-    #         'maml',
+            'protonet',
+            'relationnet',
+            'matchingnet',
+            'dkt',
+            'simpleshot',
+            'baseline',
+            'baselinepp',
+            'knn',
+            'maml',
             'protomaml',
-    #         'bmaml',
-    #         'bmaml_chaser',
-    #         'protodkt',
-    #         'btaml',  # -- left out due to an implementation error
+            'bmaml',
+            'bmaml_chaser',
+            # 'protodkt',
+            # 'relationdkt'
+            'btaml',  # -- left out due to an implementation error
         ]
     else:
         models = args.models
@@ -729,11 +780,6 @@ if __name__ == '__main__':
     
     imbalanced_tasks = [
 #         (1, 9, None, 'random', 15, 15, None, 'balanced')
-#         (1, 9, None, 'random')
-#         (1, 9, None, 'linear'), 
-#         (3, 7, None, 'linear'), 
-#         (1, 9, 0.2, 'step'),
-#         (1, 9, 0.8, 'step')
     ]
     
     if args.minimal:
@@ -797,14 +843,14 @@ if __name__ == '__main__':
             print('Strategy inference for imbalnaced target set not yet implemented.')
     
     
-#     if tailed_dataset:
-#         expfiles = imbalanced_dataset(args, models=models, seeds=seeds, save=not (args.test or args.inference))
+    if args.tailed_dataset:
+        expfiles = tailed_dataset(args, models=models, seeds=seeds, save=not (args.test or args.inference))
         
-#         if args.test:
-#             print('Balanced task testing is performed automatically after training. Use --inference to evaluate on CUB.')
+        if args.test:
+            print('Balanced task testing is performed automatically after training. Use --inference to evaluate on CUB.')
         
-#         if args.inference:
-#             cub_inference(args,expfiles)
+        if args.inference:
+            cub_inference(args,expfiles)
         
     
     if args.imbalanced_dataset:
