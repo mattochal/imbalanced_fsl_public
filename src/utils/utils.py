@@ -38,6 +38,8 @@ from tasks.batch_simple import SimpleBatchTask
 from datasets.mini import get_MiniImageNet
 from datasets.cub import get_CUB200
 from datasets.mini_to_cub import get_MiniImageNet_to_CUB200
+from datasets.metabal import get_MetaImageNetBalanced
+from datasets.metalt import get_MetaImageNetLongTail
 from datasets.custom import get_custom_dataset_from_folders
 from datasets.dataset_utils import prep_datasets
 
@@ -74,6 +76,8 @@ TASKS = {
 DATASETS = {
     "mini"       : get_MiniImageNet,
     "cub"        : get_CUB200,
+    "metalt"     : get_MetaImageNetLongTail,
+    "metabal"    : get_MetaImageNetBalanced,
     "mini_to_cub": get_MiniImageNet_to_CUB200,
     "custom"     : get_custom_dataset_from_folders
 }
