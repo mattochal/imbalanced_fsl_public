@@ -277,10 +277,10 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
             }
     else:
         train_setup = {
-            'num_epochs': [100],
+            'num_epochs': [200],
              'model_args.lr'              : [0.001], 
              'model_args.lr_decay'        : [0.1],
-             'model_args.lr_decay_step'   : [50],
+             'model_args.lr_decay_step'   : [100],
             }
         
     if pretrained_backbone is not None:
@@ -306,7 +306,7 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
                         'results_folder'             : [os.path.abspath(args.results_folder)],
                         'seed'                       : [seed],
                         'backbone'                   : ['Conv4'],
-                        'num_tasks_per_epoch'        : [200],
+                        'num_tasks_per_epoch'        : [500],
                         'num_tasks_per_validation'   : [200],
                         'num_tasks_per_testing'      : [600],
                         'strategy'                   : [strategy],
@@ -420,9 +420,9 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
                         expath += '{model_args.loss_type}/'
                 
                     elif model == 'relationdkt':
-                        variables["model_args.normalize_feature"] = [True, False]
-                        variables["model_args.sigmoid_relation"] = [True, False]
-                        variables["model_args.normalize_relation"] = [True, False]
+                        variables['model_args.normalize_feature'] = [True, False]
+                        variables['model_args.sigmoid_relation'] = [True, False]
+                        variables['model_args.normalize_relation'] = [True, False]
                         expath+='{model_args.normalize_feature}_{model_args.sigmoid_relation}_{model_args.normalize_relation}/'
 
                     elif model == 'simpleshot':

@@ -54,7 +54,8 @@ class RelationDKT(ModelTemplate):
         self.sigmoid_relation = self.args.sigmoid_relation
         
     def setup_model(self):
-        self.relation_module = RelationModule(self.backbone.final_feat_dim, 8, sigmoid=self.sigmoid_relation).to(self.device)
+        self.relation_module = RelationModule(self.backbone.final_feat_dim, 8, sigmoid=self.sigmoid_relation,
+                                             normalize=self.normalize_relation).to(self.device)
         
         if self.kernel_type=="bncossim":
             latent_size = np.prod(self.backbone.final_feat_dim)
@@ -122,7 +123,7 @@ class RelationDKT(ModelTemplate):
     
     def forward(self, x):
         h = self.backbone.forward(x)
-        if self.normalize: h = F.normalize(h, p=2, dim=1)
+        if self.normalize_feature: h = F.normalize(h, p=2, dim=1)
         return h
     
     def meta_train(self, task, ptracker):
@@ -285,9 +286,10 @@ class RelationConvBlock(nn.Module):
     
 class RelationModule(nn.Module):
     """docstring for RelationNetwork"""
-    def __init__(self, feat_dim, hidden_size, sigmoid=False):        
+    def __init__(self, feat_dim, hidden_size, sigmoid=False, normalize=False):        
         super(RelationModule, self).__init__()
         self.sigmoid = sigmoid
+        self.normalize = normalize
         padding = 1 if ( feat_dim[1] <10 ) and ( feat_dim[2] <10 ) else 0 # when using Resnet, conv map without avgpooling is 7x7, need padding in block to do pooling
 
         self.layer1 = RelationConvBlock(feat_dim[0]*2, feat_dim[0], padding = padding )
@@ -308,6 +310,9 @@ class RelationModule(nn.Module):
             out = torch.sigmoid(self.fc2(out))
         else:
             out = self.fc2(out)
+        
+        if self.normalize:
+            out = F.normalize(out, p=2, dim=1)
             
         return out
     
