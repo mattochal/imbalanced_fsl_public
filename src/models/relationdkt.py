@@ -36,7 +36,10 @@ class RelationDKT(ModelTemplate):
         parser.add_argument('--output_dim', type=dict, default={"train":-1, "val":-1, "test":-1},
                            help='output dimention for the classifer, if -1 set in code')
         parser.add_argument('--gpmodel_lr', type=float, default=0.0001)
-        parser.add_argument('--reduce_pair_features', type=bool, default=False)
+        parser.add_argument('--reduce_pair_features', type=bool, default=True)
+        parser.add_argument('--normalize_feature', type=bool, default=True)
+        parser.add_argument('--sigmoid_relation', type=bool, default=True)
+        parser.add_argument('--normalize_relation', type=bool, default=True)
         parser = ProtoNet.get_parser(parser)
         return parser
     
@@ -46,10 +49,12 @@ class RelationDKT(ModelTemplate):
         self.kernel_type=self.args.kernel_type
         self.laplace=self.args.laplace
         self.output_dim = self.args.output_dim
-        self.normalize = True #(self.kernel_type in ['cossim', 'bncossim'])
+        self.normalize_feature = self.args.normalize_feature
+        self.normalize_relation = self.args.normalize_relation
+        self.sigmoid_relation = self.args.sigmoid_relation
         
     def setup_model(self):
-#         self.relation_module = RelationModule(self.backbone.final_feat_dim, 8, sigmoid=False).to(self.device)
+        self.relation_module = RelationModule(self.backbone.final_feat_dim, 8, sigmoid=self.sigmoid_relation).to(self.device)
         
         if self.kernel_type=="bncossim":
             latent_size = np.prod(self.backbone.final_feat_dim)
@@ -64,27 +69,46 @@ class RelationDKT(ModelTemplate):
         
         self.optimizer = torch.optim.Adam([
              {'params': self.backbone.parameters(), 'lr': self.args.lr},
-#              {'params': self.relation_module.parameters(), 'lr': self.args.lr}
+             {'params': self.relation_module.parameters(), 'lr': self.args.lr},
              {'params': self.gpmodel.parameters(), 'lr': self.args.gpmodel_lr},
         ])
         self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, 
                                                             step_size=self.args.lr_decay_step, 
                                                             gamma=self.args.lr_decay)
     
+#     def construct_pairs(self, proto_h, targets_h):
+#         n_proto  = len(proto_h) # n_way
+#         n_targets = len(targets_h) # n_query * n_way
+        
+#         proto_h_ext  =  proto_h.unsqueeze(0).repeat(n_targets,1,1)
+#         targets_h_ext = targets_h.unsqueeze(0).repeat(n_proto,1,1)
+        
+#         targets_h_ext = torch.transpose(targets_h_ext,0,1)
+        
+#         extend_final_feat_dim = self.backbone.final_feat_dim
+#         extend_final_feat_dim *= 2
+#         relation_pairs = torch.cat((proto_h_ext, targets_h_ext),2).view(-1, extend_final_feat_dim)
+#         if self.normalize: relation_pairs = F.normalize(relation_pairs, p=2, dim=1)
+#         return relation_pairs
+    
+    
     def construct_pairs(self, proto_h, targets_h):
+        proto_h  =  proto_h.view(-1, *self.backbone.final_feat_dim)
+        targets_h = targets_h.view(-1, *self.backbone.final_feat_dim)
+        
         n_proto  = len(proto_h) # n_way
         n_targets = len(targets_h) # n_query * n_way
         
-        proto_h_ext  =  proto_h.unsqueeze(0).repeat(n_targets,1,1)
-        targets_h_ext = targets_h.unsqueeze(0).repeat(n_proto,1,1)
+        proto_h_ext  =  proto_h.unsqueeze(0).repeat(n_targets,1,1,1,1)
+        targets_h_ext = targets_h.unsqueeze(0).repeat(n_proto,1,1,1,1)
         
         targets_h_ext = torch.transpose(targets_h_ext,0,1)
         
-        extend_final_feat_dim = self.backbone.final_feat_dim
-        extend_final_feat_dim *= 2
-        relation_pairs = torch.cat((proto_h_ext, targets_h_ext),2).view(-1, extend_final_feat_dim)
-        if self.normalize: relation_pairs = F.normalize(relation_pairs, p=2, dim=1)
+        extend_final_feat_dim = self.backbone.final_feat_dim.copy()
+        extend_final_feat_dim[0] *= 2
+        relation_pairs = torch.cat((proto_h_ext, targets_h_ext),2).view(-1, *extend_final_feat_dim)
         return relation_pairs
+    
     
     def calc_prototypes(self, h, y):
         """
@@ -98,7 +122,7 @@ class RelationDKT(ModelTemplate):
     
     def forward(self, x):
         h = self.backbone.forward(x)
-#         if self.normalize: h = F.normalize(h, p=2, dim=1)
+        if self.normalize: h = F.normalize(h, p=2, dim=1)
         return h
     
     def meta_train(self, task, ptracker):
@@ -264,7 +288,7 @@ class RelationModule(nn.Module):
     def __init__(self, feat_dim, hidden_size, sigmoid=False):        
         super(RelationModule, self).__init__()
         self.sigmoid = sigmoid
-#         padding = 1 if ( feat_dim[1] <10 ) and ( feat_dim[2] <10 ) else 0 # when using Resnet, conv map without avgpooling is 7x7, need padding in block to do pooling
+        padding = 1 if ( feat_dim[1] <10 ) and ( feat_dim[2] <10 ) else 0 # when using Resnet, conv map without avgpooling is 7x7, need padding in block to do pooling
 
         self.layer1 = RelationConvBlock(feat_dim[0]*2, feat_dim[0], padding = padding )
         self.layer2 = RelationConvBlock(feat_dim[0], feat_dim[0], padding = padding )

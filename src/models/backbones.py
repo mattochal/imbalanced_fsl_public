@@ -271,7 +271,7 @@ class ConvNet(nn.Module):
         return out
 
 class ConvNetNopool(nn.Module): #Relation net use a 4 layer conv with pooling in only first two layers, else no pooling
-    def __init__(self, depth, device, outdim):
+    def __init__(self, depth, device, flatten, outdim):
         super(ConvNetNopool,self).__init__()
         self.num_layers = depth
         trunk = []
@@ -280,57 +280,63 @@ class ConvNetNopool(nn.Module): #Relation net use a 4 layer conv with pooling in
             outdim = outdim
             B = ConvBlock(indim, outdim, device, pool = ( i in [0,1] ), padding = 0 if i in[0,1] else 1) #only first two layer has pooling and no padding
             trunk.append(B)
+            
+        if flatten:
+            self.final_feat_dim = [outdim * 19 * 19]
+            trunk.append(Flatten().to(device))
+        else:
+            self.final_feat_dim = [outdim,19,19]
+        
         self.trunk = nn.Sequential(*trunk)
-        self.final_feat_dim = [outdim,19,19]
 
     def forward(self,x):
         out = self.trunk(x)
         return out
 
-class ConvNetS(nn.Module): #For omniglot, only 1 input channel, output dim is 64
-    def __init__(self, depth, flatten = True,  maml=False):
-        super(ConvNetS,self).__init__()
-        self.num_layers = depth
-        trunk = []
-        for i in range(depth):
-            indim = 1 if i == 0 else 64
-            outdim = 64
-            B = ConvBlock(indim, outdim, device, pool = ( i <4 ), maml=maml) #only pooling for fist 4 layers
-            trunk.append(B)
+# class ConvNetS(nn.Module): #For omniglot, only 1 input channel, output dim is 64
+#     def __init__(self, depth, flatten = True,  maml=False):
+#         super(ConvNetS,self).__init__()
+#         self.num_layers = depth
+#         trunk = []
+#         for i in range(depth):
+#             indim = 1 if i == 0 else 64
+#             outdim = 64
+#             B = ConvBlock(indim, outdim, device, pool = ( i <4 ), maml=maml) #only pooling for fist 4 layers
+#             trunk.append(B)
 
-        if flatten:
-            trunk.append(Flatten())
+#         if flatten:
+#             trunk.append(Flatten())
 
-        #trunk.append(nn.BatchNorm1d(64))    #TODO remove
-        #trunk.append(nn.ReLU(inplace=True)) #TODO remove
-        #trunk.append(nn.Linear(64, 64))     #TODO remove
-        self.trunk = nn.Sequential(*trunk)
-        self.final_feat_dim = 64
+#         #trunk.append(nn.BatchNorm1d(64))    #TODO remove
+#         #trunk.append(nn.ReLU(inplace=True)) #TODO remove
+#         #trunk.append(nn.Linear(64, 64))     #TODO remove
+#         self.trunk = nn.Sequential(*trunk)
+#         self.final_feat_dim = 64
 
-    def forward(self,x):
-        out = x[:,0:1,:,:] #only use the first dimension
-        out = self.trunk(out)
-        #out = torch.tanh(out) #TODO remove
-        return out
+#     def forward(self,x):
+#         out = x[:,0:1,:,:] #only use the first dimension
+#         out = self.trunk(out)
+#         #out = torch.tanh(out) #TODO remove
+#         return out
 
-class ConvNetSNopool(nn.Module): #Relation net use a 4 layer conv with pooling in only first two layers, else no pooling. For omniglot, only 1 input channel, output dim is [64,5,5]
-    def __init__(self, depth):
-        super(ConvNetSNopool,self).__init__()
-        self.num_layers = depth
-        trunk = []
-        for i in range(depth):
-            indim = 1 if i == 0 else 64
-            outdim = 64
-            B = ConvBlock(indim, outdim, device, pool = ( i in [0,1] ), padding = 0 if i in[0,1] else 1) #only first two layer has pooling and no padding
-            trunk.append(B)
+# class ConvNetSNopool(nn.Module): #Relation net use a 4 layer conv with pooling in only first two layers, else no pooling. For omniglot, only 1 input channel, output dim is [64,5,5]
+#     def __init__(self, depth):
+#         super(ConvNetSNopool,self).__init__()
+#         self.num_layers = depth
+#         trunk = []
+#         for i in range(depth):
+#             indim = 1 if i == 0 else 64
+#             outdim = 64
+#             B = ConvBlock(indim, outdim, device, pool = ( i in [0,1] ), padding = 0 if i in[0,1] else 1) #only first two layer has pooling and no padding
+#             trunk.append(B)
 
-        self.trunk = nn.Sequential(*trunk)
-        self.final_feat_dim = [64,5,5]
+#         self.trunk = nn.Sequential(*trunk)
+#         self.final_feat_dim = [64,5,5]
 
-    def forward(self,x):
-        out = x[:,0:1,:,:] #only use the first dimension
-        out = self.trunk(out)
-        return out
+#     def forward(self,x):
+#         out = x[:,0:1,:,:] #only use the first dimension
+#         out = self.trunk(out)
+#         return out
 
 class ResNet(nn.Module):
     def __init__(self,block,list_of_num_layers, list_of_out_dims, device, flatten = True, maml=False):
@@ -380,23 +386,23 @@ class ResNet(nn.Module):
         out = self.trunk(x)
         return out
 
-def Conv4(device, maml=False, outdim=64):
-    return ConvNet(4, device, maml=maml, outdim=outdim)
+def Conv4(device, flatten = True,  maml=False, outdim=64):
+    return ConvNet(4, device, flatten=flatten, maml=maml, outdim=outdim)
 
-def Conv6(device, maml=False, outdim=64):
-    return ConvNet(6, device, maml=maml, outdim=outdim)
+def Conv6(device, flatten = True,  maml=False, outdim=64):
+    return ConvNet(6, device, flatten=flatten, maml=maml, outdim=outdim)
 
-def Conv4NP(device, maml=None, outdim=64):
-    return ConvNetNopool(4, device, outdim=outdim)
+def Conv4NP(device,flatten = False, maml=None, outdim=64):
+    return ConvNetNopool(4, device, flatten=flatten, outdim=outdim)
 
-def Conv6NP(device, maml=None, outdim=64):
-    return ConvNetNopool(6, device, outdim=outdim)
+def Conv6NP(device,flatten = False, maml=None, outdim=64):
+    return ConvNetNopool(6, device, flatten=flatten, outdim=outdim)
 
-def Conv4S(device, maml=False, outdim=None):
-    return ConvNetS(4, device, maml=maml)
+# def Conv4S(device, flatten = True, maml=False, outdim=None):
+#     return ConvNetS(4, device, flatten=flatten, maml=maml)
 
-def Conv4SNP(device, maml=None, outdim=None):
-    return ConvNetSNopool(4, device)
+# def Conv4SNP(device,flatten = True, maml=None, outdim=None):
+#     return ConvNetSNopool(4, flatten=flatten, device)
 
 def ResNet10(device, flatten = True, maml=False, outdim=None):
     return ResNet(SimpleBlock, [1,1,1,1],[64,128,256,512], device, flatten, maml=maml)

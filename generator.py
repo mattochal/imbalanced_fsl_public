@@ -277,10 +277,10 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
             }
     else:
         train_setup = {
-            'num_epochs': [200],
+            'num_epochs': [100],
              'model_args.lr'              : [0.001], 
              'model_args.lr_decay'        : [0.1],
-             'model_args.lr_decay_step'   : [100],
+             'model_args.lr_decay_step'   : [50],
             }
         
     if pretrained_backbone is not None:
@@ -306,7 +306,7 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
                         'results_folder'             : [os.path.abspath(args.results_folder)],
                         'seed'                       : [seed],
                         'backbone'                   : ['Conv4'],
-                        'num_tasks_per_epoch'        : [500],
+                        'num_tasks_per_epoch'        : [200],
                         'num_tasks_per_validation'   : [200],
                         'num_tasks_per_testing'      : [600],
                         'strategy'                   : [strategy],
@@ -418,6 +418,12 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
                     elif model == 'relationnet':
                         variables['model_args.loss_type'] = ['softmax']
                         expath += '{model_args.loss_type}/'
+                
+                    elif model == 'relationdkt':
+                        variables["model_args.normalize_feature"] = [True, False]
+                        variables["model_args.sigmoid_relation"] = [True, False]
+                        variables["model_args.normalize_relation"] = [True, False]
+                        expath+='{model_args.normalize_feature}_{model_args.sigmoid_relation}_{model_args.normalize_relation}/'
 
                     elif model == 'simpleshot':
                         variables['task_args.train.batch_size'] = [128]
@@ -504,15 +510,17 @@ def imbalanced_task_test(args, expfiles):
 def strategy_inference(args, expfiles):
     n_way=5
     test_settings = [  
-        (1, 9,  None, "linear"),
-        (2, 8,  None, "linear"),
-        (3, 7,  None, "linear"),
-        (4, 6,  None, "linear"),
-        (5, 5,  None, 'linear'),  # K_min, K_max, N_min, I-distribution    
-        
-#         (1, 9,  None, 'random'),
-#         (4, 6,  None, 'linear'),
-#         (1, 9,  0.2,  'step')       # N_min expressed as a fraction of 'n_way'
+        (5, 5,  None, 'balanced', 15, 15, None, 'balanced'),  # K_min, K_max, N_min, I-distribution 
+        (4, 6,  None, 'linear', 15, 15, None, 'balanced'),
+        (3, 7,  None, 'linear', 15, 15, None, 'balanced'),
+        (2, 8,  None, 'linear', 15, 15, None, 'balanced'),
+        (1, 9,  None, 'linear', 15, 15, None, 'balanced'),
+        (1, 21,  0.8, 'step', 15, 15, None, 'balanced'),
+        (1, 6,  0.2, 'step', 15, 15, None, 'balanced'),
+        (1, 9,  0.8, 'step', 15, 15, None, 'balanced'),
+        (3, 7,  None, 'random', 15, 15, None, 'balanced'),
+        (1, 9,  None, 'random', 15, 15, None, 'balanced'),
+        (1, 9,  0.2,  'step', 15, 15, None, 'balanced')       # N_min expressed as a fraction of 'n_way'
     ]
     test_names = make_names(test_settings, n_way)
     
@@ -542,19 +550,24 @@ def strategy_inference(args, expfiles):
             
             for t, test_setting in enumerate(test_settings):
                 test_name = test_names[t]
-                min_k, max_k, minor, dist = test_setting
 
                 variables = {
                     'continue_from' :                        [continue_from],
                     'evaluate_on_test_set_only':             [True],
                     'test_performance_tag':                  [test_name],
                     'task_args.test.num_classes':            [n_way],
-                    'task_args.test.num_targets':            [16],
-                    'task_args.test.min_num_supports':       [min_k],
-                    'task_args.test.max_num_supports':       [max_k],
-                    'task_args.test.num_minority':           [minor],
-                    'task_args.test.imbalance_distribution': [dist]
                 }
+                variables[(
+                    'task_args.test.min_num_supports',
+                    'task_args.test.max_num_supports',
+                    'task_args.test.num_minority',
+                    'task_args.test.imbalance_distribution',
+                    'task_args.test.min_num_targets', 
+                    'task_args.test.max_num_targets',
+                    'task_args.test.num_minority_tagets',
+                    'task_args.test.imbalance_distribution_targets'
+                )] = [test_setting]
+                
                 expath = 'strategy_inference/{strategy}/'
 
                 if strategy == 'cb_loss':
@@ -702,6 +715,8 @@ if __name__ == '__main__':
                         help='Folder with data')
     parser.add_argument('--models', '--model', type=str, nargs="*", default=[],
                         help='Run selected models')
+    parser.add_argument('--seeds', '--seed', type=int, nargs="*", default=[],
+                        help='Generate experiments using selected seed numbers')
     parser.add_argument('--results_folder', type=str, default='./experiments/',
                         help='Folder for saving the experiment config/scripts/logs into')
     parser.add_argument('--imbalanced_supports', type=str2bool, nargs='?', const=True, default=False,
@@ -760,22 +775,25 @@ if __name__ == '__main__':
 #         'cb_loss'
     ]
     
-    seeds = [
-        0,
-        1, 
-        2
-    ]
+    if args.seeds is None:
+        seeds = [
+            0,
+            1, 
+            2
+        ]
+    else:
+        seeds = args.seeds
     
     balanced_tasks = [
         (5, 5, None, 'balanced', 15, 15, None, 'balanced')
-#         (10, 10, None, 'balanced', 15, 15, None, 'balanced')
-#         (15, 15, None, 'balanced', 15, 15, None, 'balanced')
+#         (10, 10, None, 'balanced', 15, 15, None, 'balanced')  # -- uncomment if appropiate
+#         (15, 15, None, 'balanced', 15, 15, None, 'balanced')  # -- uncomment if appropiate
     ]
     
     imbalanced_tasks = [
-        (1, 9, None, 'random', 15, 15, None, 'balanced')
-#         (1, 19, None, 'random', 15, 15, None, 'balanced')
-#         (1, 29, None, 'random', 15, 15, None, 'balanced')
+#         (1, 9, None, 'random', 15, 15, None, 'balanced')
+#         (1, 19, None, 'random', 15, 15, None, 'balanced')  # -- uncomment if appropiate
+#         (1, 29, None, 'random', 15, 15, None, 'balanced')  # -- uncomment if appropiate
     ]
     
     if args.minimal:

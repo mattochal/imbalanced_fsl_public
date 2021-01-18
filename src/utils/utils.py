@@ -103,7 +103,7 @@ MODELS = {
 
 BACKBONES = {
     "Conv4"    : backbones.Conv4,
-    "Conv4S"   : backbones.Conv4S,
+#     "Conv4S"   : backbones.Conv4S,
     "Conv6"    : backbones.Conv6,
     "ResNet10" : backbones.ResNet10,
     "ResNet18" : backbones.ResNet18,
@@ -460,7 +460,7 @@ def get_backbone(args, device):
     if backbone_name not in BACKBONES:
         raise Exception("Backbone not found: {}".format(backbone_name))
     
-    if "relationnet" in model_name:
+    if model_name in ["relationnet", "relationdkt"]:
         if backbone_name == "Conv4":
             return backbones.Conv4NP(device, outdim=args.backbone_channel_dim)
         if backbone_name == "Conv4S":
