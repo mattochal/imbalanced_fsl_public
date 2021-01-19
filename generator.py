@@ -397,7 +397,7 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
 #                         expath += '/'
                         
                     elif model == 'btaml':
-                        variables['backbone_channel_dim'] = [32,64]
+                        variables['backbone_channel_dim'] = [32]
                         variables['model_args.lr'] = [0.0001]
                         variables[('model_args.approx','model_args.approx_until')] = [(True,0)]
                         variables['model_args.batch_size'] = [4]
@@ -450,18 +450,37 @@ def imbalanced_task_test(args, expfiles):
     
     n_way=5
     test_settings = [
-        (5, 5,  None, 'balanced', 15, 15, None, 'balanced'),  # K_min, K_max, N_min, I-distribution 
-        (4, 6,  None, 'linear', 15, 15, None, 'balanced'),
-        (3, 7,  None, 'linear', 15, 15, None, 'balanced'),
-        (2, 8,  None, 'linear', 15, 15, None, 'balanced'),
-        (1, 9,  None, 'linear', 15, 15, None, 'balanced'),
-        (1, 21,  0.8, 'step', 15, 15, None, 'balanced'),
-        (1, 6,  0.2, 'step', 15, 15, None, 'balanced'),
-        (1, 9,  0.8, 'step', 15, 15, None, 'balanced'),
-        (3, 7,  None, 'random', 15, 15, None, 'balanced'),
-        (1, 9,  None, 'random', 15, 15, None, 'balanced'),
-        (1, 9,  0.2,  'step', 15, 15, None, 'balanced')       # N_min expressed as a fraction of 'n_way'
+#         (5, 5,  None, 'balanced', 15, 15, None, 'balanced'),
+#         (4, 6,  None, 'linear', 15, 15, None, 'balanced'),
+#         (3, 7,  None, 'linear', 15, 15, None, 'balanced'),
+#         (2, 8,  None, 'linear', 15, 15, None, 'balanced'),
+#         (1, 9,  None, 'linear', 15, 15, None, 'balanced'),
+#         (1, 21,  0.8, 'step', 15, 15, None, 'balanced'),
+#         (1, 6,  0.2, 'step', 15, 15, None, 'balanced'),
+#         (1, 9,  0.8, 'step', 15, 15, None, 'balanced'),
+#         (3, 7,  None, 'random', 15, 15, None, 'balanced'),
+#         (1, 9,  None, 'random', 15, 15, None, 'balanced'),
+#         (1, 9,  0.2,  'step', 15, 15, None, 'balanced')  
+        
+        
+        #### Test settings for 15 avr shot experiments 
+        (15, 15,  None, 'balanced', 15, 15, None, 'balanced'),
+        (10, 20,  None,   'linear', 15, 15, None, 'balanced'),
+        (13, 17,  None,   'linear', 15, 15, None, 'balanced'),
+        ( 5, 25,  None,   'linear', 15, 15, None, 'balanced'),
+        ( 3, 27,  None,   'linear', 15, 15, None, 'balanced'),
+        ( 1, 29,  None,   'linear', 15, 15, None, 'balanced'),
+        
+        
+        #### Test settings for 25 avr shot experiments 
+#         (25, 25,  None, 'balanced', 15, 15, None, 'balanced'),
+#         (20, 30,  None,   'linear', 15, 15, None, 'balanced'),
+#         (15, 35,  None,   'linear', 15, 15, None, 'balanced'),
+#         (10, 40,  None,   'linear', 15, 15, None, 'balanced'),
+#         ( 5, 45,  None,   'linear', 15, 15, None, 'balanced'),
+#         ( 1, 49,  None,   'linear', 15, 15, None, 'balanced'),
     ]
+    
     test_names = make_names(test_settings, n_way)
     
     for experiment in expfiles:
@@ -715,6 +734,8 @@ if __name__ == '__main__':
                         help='Folder with data')
     parser.add_argument('--models', '--model', type=str, nargs="*", default=[],
                         help='Run selected models')
+    parser.add_argument('--strategies', '--strategy', type=str, nargs="*", default=[],
+                        help='Run selected strategies')
     parser.add_argument('--seeds', '--seed', type=int, nargs="*", default=[],
                         help='Generate experiments using selected seed numbers')
     parser.add_argument('--results_folder', type=str, default='./experiments/',
@@ -765,17 +786,20 @@ if __name__ == '__main__':
         ]
     else:
         models = args.models
+        
+    if args.strategies is None or len(args.strategies) == 0:
+        strategies = [
+            None,
+            'ros',
+            'ros_aug',
+            # 'focal_loss',
+            # 'weighted_loss',
+            # 'cb_loss'
+        ]
+    else:
+        strategies = [ None if s in ['None','none'] else s for s in args.strategies]
     
-    strategies = [
-        None,
-#         'ros',
-#         'ros_aug',
-#         'focal_loss',    # -- left for anyone to try 
-#         'weighted_loss',  # -- left for anyone to try 
-#         'cb_loss'
-    ]
-    
-    if args.seeds is None:
+    if args.seeds is None or len(args.seeds) == 0:
         seeds = [
             0,
             1, 
@@ -783,17 +807,17 @@ if __name__ == '__main__':
         ]
     else:
         seeds = args.seeds
-    
+        
     balanced_tasks = [
-        (5, 5, None, 'balanced', 15, 15, None, 'balanced')
-#         (10, 10, None, 'balanced', 15, 15, None, 'balanced')  # -- uncomment if appropiate
-#         (15, 15, None, 'balanced', 15, 15, None, 'balanced')  # -- uncomment if appropiate
+#         (5, 5, None, 'balanced', 15, 15, None, 'balanced'),
+#         (15, 15, None, 'balanced', 15, 15, None, 'balanced'),  # -- uncomment if appropiate
+        (25, 25, None, 'balanced', 15, 15, None, 'balanced'),  # -- uncomment if appropiate
     ]
     
     imbalanced_tasks = [
-#         (1, 9, None, 'random', 15, 15, None, 'balanced')
-#         (1, 19, None, 'random', 15, 15, None, 'balanced')  # -- uncomment if appropiate
-#         (1, 29, None, 'random', 15, 15, None, 'balanced')  # -- uncomment if appropiate
+#         (1, 9, None, 'random', 15, 15, None, 'balanced'),
+        (1, 29, None, 'random', 15, 15, None, 'balanced'),  # -- uncomment if appropiate
+        (1, 49, None, 'random', 15, 15, None, 'balanced'),  # -- uncomment if appropiate
     ]
     
     if args.minimal:
