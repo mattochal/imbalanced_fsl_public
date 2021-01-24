@@ -273,7 +273,7 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
             'num_epochs': [1000],
              'model_args.lr'              : [0.001], 
              'model_args.lr_decay'        : [0.1],
-             'model_args.lr_decay_step'   : [250,500,1000],
+             'model_args.lr_decay_step'   : [500],
             }
     else:
         train_setup = {
@@ -782,7 +782,7 @@ if __name__ == '__main__':
             'bmaml_chaser',
             # 'protodkt',
             # 'relationdkt'
-            'btaml',  # -- left out due to an implementation error
+            # 'btaml',  # -- left out due to an implementation error
         ]
     else:
         models = args.models
@@ -809,15 +809,18 @@ if __name__ == '__main__':
         seeds = args.seeds
         
     balanced_tasks = [
-#         (5, 5, None, 'balanced', 15, 15, None, 'balanced'),
+#         (5, 5, None, 'balanced', 15, 15, None, 'balanced'),  # Standard Meta-Training
+        
 #         (15, 15, None, 'balanced', 15, 15, None, 'balanced'),  # -- uncomment if appropiate
-        (25, 25, None, 'balanced', 15, 15, None, 'balanced'),  # -- uncomment if appropiate
+#         (25, 25, None, 'balanced', 15, 15, None, 'balanced'),  # -- uncomment if appropiate
     ]
     
     imbalanced_tasks = [
-#         (1, 9, None, 'random', 15, 15, None, 'balanced'),
-        (1, 29, None, 'random', 15, 15, None, 'balanced'),  # -- uncomment if appropiate
-        (1, 49, None, 'random', 15, 15, None, 'balanced'),  # -- uncomment if appropiate
+        (1, 9, None, 'unbiased', 15, 15, None, 'balanced'),   # Unbiased-Random Meta-Training
+#         (1, 9, None, 'random', 15, 15, None, 'balanced'),   # Random-Shot Meta-Training
+        
+#         (1, 29, None, 'random', 15, 15, None, 'balanced'),  # -- uncomment if appropiate
+#         (1, 49, None, 'random', 15, 15, None, 'balanced'),  # -- uncomment if appropiate
     ]
     
     if args.minimal:
