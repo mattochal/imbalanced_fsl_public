@@ -63,6 +63,7 @@ from models.relationdkt import RelationDKT
 # Imbalance Strategies
 from strategies.ros import ROS
 from strategies.ros_aug import ROS_AUG
+from strategies.freq_ros_aug import FREQ_ROS_AUG
 from strategies.focal_loss import FocalLoss
 from strategies.weighted_loss import WeightedLoss
 from strategies.cb_loss import CBLoss
@@ -83,7 +84,7 @@ DATASETS = {
 }
 
 MODELS = {
-    "protonet"    : ProtoNet,        
+    "protonet"    : ProtoNet,
     "relationnet" : RelationNet,  
     "matchingnet" : MatchingNet,  
     "baseline"    : Baseline,        
@@ -118,6 +119,7 @@ STRATEGIES = {
     "weighted_loss": WeightedLoss,
     "focal_loss"   : FocalLoss,
     "cb_loss"      : CBLoss,
+    "freq_ros_aug" : FREQ_ROS_AUG,
     None           : StrategyTemplate
 }
 

@@ -450,8 +450,11 @@ def imbalanced_task_test(args, expfiles):
     
     n_way=5
     test_settings = [
-#         (5, 5,  None, 'balanced', 15, 15, None, 'balanced'),
-#         (4, 6,  None, 'linear', 15, 15, None, 'balanced'),
+        # Test of 5 avr shot experiments
+        (5, 5,  None, 'balanced', 15, 15, None, 'balanced'),
+        (4, 6,  None, 'linear', 15, 15, None, 'balanced'),
+        (1, 9,  None, 'random', 15, 15, None, 'balanced'),
+        (1, 9,  0.2,  'step', 15, 15, None, 'balanced')  
 #         (3, 7,  None, 'linear', 15, 15, None, 'balanced'),
 #         (2, 8,  None, 'linear', 15, 15, None, 'balanced'),
 #         (1, 9,  None, 'linear', 15, 15, None, 'balanced'),
@@ -459,26 +462,22 @@ def imbalanced_task_test(args, expfiles):
 #         (1, 6,  0.2, 'step', 15, 15, None, 'balanced'),
 #         (1, 9,  0.8, 'step', 15, 15, None, 'balanced'),
 #         (3, 7,  None, 'random', 15, 15, None, 'balanced'),
-#         (1, 9,  None, 'random', 15, 15, None, 'balanced'),
-#         (1, 9,  0.2,  'step', 15, 15, None, 'balanced')  
-        
         
         #### Test settings for 15 avr shot experiments 
-        (15, 15,  None, 'balanced', 15, 15, None, 'balanced'),
-        (10, 20,  None,   'linear', 15, 15, None, 'balanced'),
-        (13, 17,  None,   'linear', 15, 15, None, 'balanced'),
-        ( 5, 25,  None,   'linear', 15, 15, None, 'balanced'),
-        ( 3, 27,  None,   'linear', 15, 15, None, 'balanced'),
-        ( 1, 29,  None,   'linear', 15, 15, None, 'balanced'),
-        
+        # (15, 15,  None, 'balanced', 15, 15, None, 'balanced'),
+        # (10, 20,  None,   'linear', 15, 15, None, 'balanced'),
+        # (13, 17,  None,   'linear', 15, 15, None, 'balanced'),
+        # ( 5, 25,  None,   'linear', 15, 15, None, 'balanced'),
+        # ( 3, 27,  None,   'linear', 15, 15, None, 'balanced'),
+        # ( 1, 29,  None,   'linear', 15, 15, None, 'balanced'),
         
         #### Test settings for 25 avr shot experiments 
-#         (25, 25,  None, 'balanced', 15, 15, None, 'balanced'),
-#         (20, 30,  None,   'linear', 15, 15, None, 'balanced'),
-#         (15, 35,  None,   'linear', 15, 15, None, 'balanced'),
-#         (10, 40,  None,   'linear', 15, 15, None, 'balanced'),
-#         ( 5, 45,  None,   'linear', 15, 15, None, 'balanced'),
-#         ( 1, 49,  None,   'linear', 15, 15, None, 'balanced'),
+        # (25, 25,  None, 'balanced', 15, 15, None, 'balanced'),
+        # (20, 30,  None,   'linear', 15, 15, None, 'balanced'),
+        # (15, 35,  None,   'linear', 15, 15, None, 'balanced'),
+        # (10, 40,  None,   'linear', 15, 15, None, 'balanced'),
+        # ( 5, 45,  None,   'linear', 15, 15, None, 'balanced'),
+        # ( 1, 49,  None,   'linear', 15, 15, None, 'balanced'),
     ]
     
     test_names = make_names(test_settings, n_way)
@@ -768,14 +767,14 @@ if __name__ == '__main__':
     
     if args.models is None or len(args.models) == 0:
         models = [
-            'protonet',
-            'relationnet',
-            'matchingnet',
-            'dkt',
-            'simpleshot',
+#             'protonet',
+#             'relationnet',
+#             'matchingnet',
+#             'dkt',
+#             'simpleshot',
             'baseline',
             'baselinepp',
-            'knn',
+#             'knn',
             'maml',
             'protomaml',
             'bmaml',
@@ -792,6 +791,7 @@ if __name__ == '__main__':
             None,
             'ros',
             'ros_aug',
+            'freq_ros_aug'
             # 'focal_loss',
             # 'weighted_loss',
             # 'cb_loss'
@@ -810,7 +810,6 @@ if __name__ == '__main__':
         
     balanced_tasks = [
 #         (5, 5, None, 'balanced', 15, 15, None, 'balanced'),  # Standard Meta-Training
-        
 #         (15, 15, None, 'balanced', 15, 15, None, 'balanced'),  # -- uncomment if appropiate
 #         (25, 25, None, 'balanced', 15, 15, None, 'balanced'),  # -- uncomment if appropiate
     ]
