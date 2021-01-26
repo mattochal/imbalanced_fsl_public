@@ -104,7 +104,6 @@ MODELS = {
 
 BACKBONES = {
     "Conv4"    : backbones.Conv4,
-#     "Conv4S"   : backbones.Conv4S,
     "Conv6"    : backbones.Conv6,
     "ResNet10" : backbones.ResNet10,
     "ResNet18" : backbones.ResNet18,
