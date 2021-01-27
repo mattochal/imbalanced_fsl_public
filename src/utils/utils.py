@@ -63,7 +63,7 @@ from models.relationdkt import RelationDKT
 # Imbalance Strategies
 from strategies.ros import ROS
 from strategies.ros_aug import ROS_AUG
-from strategies.freq_ros_aug import FREQ_ROS_AUG
+from strategies.freq_ros_aug import FREQ_ROS_AUG,FREQ_ROS_AUG2,FREQ_ROS_AUG3,FREQ_ROS_AUG4,FREQ_ROS_AUG5
 from strategies.focal_loss import FocalLoss
 from strategies.weighted_loss import WeightedLoss
 from strategies.cb_loss import CBLoss
@@ -119,6 +119,10 @@ STRATEGIES = {
     "focal_loss"   : FocalLoss,
     "cb_loss"      : CBLoss,
     "freq_ros_aug" : FREQ_ROS_AUG,
+    "freq_ros_aug2" : FREQ_ROS_AUG2,
+    "freq_ros_aug3" : FREQ_ROS_AUG3,
+    "freq_ros_aug4" : FREQ_ROS_AUG4,
+    "freq_ros_aug5" : FREQ_ROS_AUG5,
     None           : StrategyTemplate
 }
 
