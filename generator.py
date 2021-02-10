@@ -271,9 +271,9 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
     if slow_learning:
         train_setup = {
             'num_epochs': [200],
-             'model_args.lr'              : [0.001, 0.0001], 
+             'model_args.lr'              : [0.001],
              'model_args.lr_decay'        : [1.0],
-             'model_args.lr_decay_step'   : [100],
+             'model_args.lr_decay_step'   : [200],
              'num_tasks_per_epoch'        : [2500],
             }
     else:
@@ -282,7 +282,7 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
              'model_args.lr'              : [0.001], 
              'model_args.lr_decay'        : [0.1],
              'model_args.lr_decay_step'   : [100],
-             'num_tasks_per_epoch'        : [500],
+             'num_tasks_per_epoch'        : [250],
             }
         
     if pretrained_backbone is not None:
@@ -751,6 +751,7 @@ if __name__ == '__main__':
                         help='Generate imbalanced dataset experiments')
     parser.add_argument('--tailed_dataset', type=str2bool, nargs='?', const=True, default=False,
                         help='Generate imbalanced dataset experiments with long-tail distribution')
+    parser.add_argument('--dataset', type=str, default='mini')
     parser.add_argument('--slow_learning', type=str, nargs='?', const=True, default=False,
                         help='If true, runs slower learning rate.')
     parser.add_argument('--load_backbone', type=str, nargs='?', const=True, default=False,
@@ -836,7 +837,7 @@ if __name__ == '__main__':
     if args.load_backbone:
         backbone_files = fsl_imbalanced(args, models=['baselinepp'], strategies=[None], seeds=seeds, train_tasks=[
            (5, 5, None, 'balanced', 15, 15, None, 'balanced')], save=False, expfolder='imbalanced_supports/', 
-                                        backbone=args.backbone)
+                                        backbone=args.backbone, dataset=args.dataset)
         _, _, config, _ = backbone_files[0]
         backbone = config['experiment_name']
         backbone = "/media/disk2/mateusz/repositories/imbalanced_fsl_dev/experiments/imbalanced_task/mini/Conv4/"+\
@@ -848,12 +849,12 @@ if __name__ == '__main__':
         standard_expfiles = fsl_imbalanced(args, models=models, strategies=[None], seeds=seeds, train_tasks=balanced_tasks,
                                 save=not (args.test or args.inference), expfolder='imbalanced_supports/', 
                                            pretrained_backbone=backbone, slow_learning=args.slow_learning, 
-                                        backbone=args.backbone)
+                                        backbone=args.backbone, dataset=args.dataset)
         # Random Shot meta-training
         randomshot_expfiles = fsl_imbalanced(args, models=models, strategies=strategies, seeds=seeds,
                                              train_tasks=imbalanced_tasks, save=not (args.test or args.inference), 
                                              expfolder='imbalanced_supports/', pretrained_backbone=backbone, 
-                                             slow_learning=args.slow_learning, backbone=args.backbone)
+                                             slow_learning=args.slow_learning, backbone=args.backbone, dataset=args.dataset)
         
         if args.test: 
             imbalanced_task_test(args, standard_expfiles)
@@ -880,7 +881,7 @@ if __name__ == '__main__':
         expfiles = fsl_imbalanced(args, models=models, strategies=[None], seeds=seeds, train_tasks=train_tasks, 
                                   test_tasks=test_tasks, save=not(args.test or args.inference), 
                                   expfolder='imbalanced_targets2/', pretrained_backbone=backbone, 
-                                  slow_learning=args.slow_learning, backbone=args.backbone)
+                                  slow_learning=args.slow_learning, backbone=args.backbone,dataset=args.dataset)
         
         if args.test:
             imbalanced_target_test(args, expfiles)
@@ -889,26 +890,26 @@ if __name__ == '__main__':
             print('Strategy inference for imbalnaced target set not yet implemented.')
     
     
-    if args.tailed_dataset:
-        expfiles = tailed_dataset(args, models=models, seeds=seeds, save=not (args.test or args.inference), 
-                                        backbone=args.backbone)
+#     if args.tailed_dataset:
+#         expfiles = tailed_dataset(args, models=models, seeds=seeds, save=not (args.test or args.inference), 
+#                                         backbone=args.backbone)
         
-        if args.test:
-            print('Balanced task testing is performed automatically after training. Use --inference to evaluate on CUB.')
+#         if args.test:
+#             print('Balanced task testing is performed automatically after training. Use --inference to evaluate on CUB.')
         
-        if args.inference:
-            cub_inference(args,expfiles)
+#         if args.inference:
+#             cub_inference(args,expfiles)
         
     
-    if args.imbalanced_dataset:
-        expfiles = imbalanced_dataset(args, models=models, seeds=seeds, save=not (args.test or args.inference), 
-                                        backbone=args.backbone)
+#     if args.imbalanced_dataset:
+#         expfiles = imbalanced_dataset(args, models=models, seeds=seeds, save=not (args.test or args.inference), 
+#                                         backbone=args.backbone)
         
-        if args.test:
-            print('Balanced task testing is performed automatically after training. Use --inference to evaluate on CUB.')
+#         if args.test:
+#             print('Balanced task testing is performed automatically after training. Use --inference to evaluate on CUB.')
         
-        if args.inference:
-            cub_inference(args,expfiles)
+#         if args.inference:
+#             cub_inference(args,expfiles)
             
     
     if not (args.imbalanced_dataset or args.imbalanced_supports or args.imbalanced_targets or args.tailed_dataset):
