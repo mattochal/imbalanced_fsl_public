@@ -85,7 +85,7 @@ def load_dataset_from_from_folder(in_path, cache_path, use_cache=True, image_siz
         if not os.path.isfile(cache_path):
             image_paths, class_dict = scan_folder_structure(in_path)
             print("Scanning for images {}".format(in_path,''))
-            image_data = load_images_from_paths_parallel(image_paths, image_size=image_size)
+            image_data = load_images_from_paths_parallel(image_paths, final_image_size=image_size)
             data = {"image_data":image_data, "class_dict": class_dict}
             
             print("Saving image cache {}".format(cache_path))
@@ -146,7 +146,7 @@ def load_images_from_paths(image_paths):
     return image_data
 
 
-def load_images_from_paths_parallel(image_paths, num_threads=16, image_size=None):
+def load_images_from_paths_parallel(image_paths, num_threads=16, final_image_size=None):
     print("Loading {} images into RAM".format(len(image_paths)))
     image_data = [None]*len(image_paths)
 
@@ -155,23 +155,29 @@ def load_images_from_paths_parallel(image_paths, num_threads=16, image_size=None
         with tqdm.tqdm(total=len(image_paths)) as pbar_memory_load:
             for i, (image, image_path) in zip(range(len(image_paths)), 
                                               executor.map(lambda p: load_image(*p), 
-                                                           zip(image_paths, itertools.repeat(image_size)))):
+                                                           zip(image_paths, itertools.repeat(final_image_size)))):
                 image_data[i] = np.asarray(image)
                 assert image_path == image_paths[i]
                 image_size = np.shape(image)
+                assert image_size == final_image_size, "Image was not properly resized. Image of shape {}".format(image_size)
                 pbar_memory_load.update(1)
-                pbar_memory_load.set_description("Getting{}: {} to {}".format(" and resizing" if image_size is not None else "",
-                                                                        os.path.basename(image_path),
-                                                                        image_size
-                                                                       ))
+                pbar_memory_load.set_description("Getting{}: {} to {}".format(
+                    " and resizing" if final_image_size is not None else "", os.path.basename(image_path), final_image_size))
     return np.asarray(image_data)
 
     
 def load_image(image_path, image_size=None):
+    if len(image_size) == 3:
+        h,w,c = image_size
+    else:
+        h,w = image_size
+        c = 1
     im = Image.open(image_path)
     im.load()
     if image_size is not None:
-        im = im.resize(image_size, Image.ANTIALIAS)
+        im = im.resize((h,w), Image.ANTIALIAS)
+    if c == 3 and im.mode == 'L':
+        im = im.convert('RGB')
     return im, image_path
    
     

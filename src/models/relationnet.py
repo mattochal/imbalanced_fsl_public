@@ -67,7 +67,7 @@ class RelationNet(ProtoNet):
         
         if self.loss_type == 'mse':
             targets_y_onehot = Variable(uu.onehot(targets_y).float().to(self.device))
-            loss = self.loss_fn(scores, targets_y_onehot)
+            loss = self.strategy.apply_outer_loss(self.loss_fn, scores, targets_y_onehot)
         else:
             loss = self.strategy.apply_outer_loss(self.loss_fn, scores, targets_y)
         

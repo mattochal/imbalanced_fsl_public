@@ -10,7 +10,7 @@ import random
 import argparse
 
 
-class GPShot(ModelTemplate):
+class DKT(ModelTemplate):
     
     KERNEL_TYPES = ['bncossim', 'linear', 'rbf', 'matern', 'poli1', 'poli2', 'cossim', 'bncossim']
     
@@ -20,7 +20,7 @@ class GPShot(ModelTemplate):
         returns a parser for the given model. Can also return a subparser
         """
         parser = ModelTemplate.get_parser(parser)
-        parser.add_argument('--kernel_type', type=str, choices=GPShot.KERNEL_TYPES, default='bncossim',
+        parser.add_argument('--kernel_type', type=str, choices=DKT.KERNEL_TYPES, default='bncossim',
                            help='kernel type')
         parser.add_argument('--laplace', type=bool, default=False,
                            help='use laplace approximation during evaluation')
@@ -30,7 +30,7 @@ class GPShot(ModelTemplate):
         return parser
     
     def __init__(self, backbone, strategy, args, device):
-        super(GPShot, self).__init__(backbone, strategy, args, device)
+        super(DKT, self).__init__(backbone, strategy, args, device)
         self.kernel_type=self.args.kernel_type
         self.laplace=self.args.laplace
         self.output_dim = self.args.output_dim
@@ -44,18 +44,14 @@ class GPShot(ModelTemplate):
         train_x = torch.ones(100, 64).to(self.device)
         train_y = torch.ones(100).to(self.device)
         self.likelihood = gpytorch.likelihoods.GaussianLikelihood().to(self.device)
-        self.gpmodel = ExactGPLayer(
-            train_x=train_x, 
-            train_y=train_y, 
-            likelihood=self.likelihood,
-            kernel=self.kernel_type
-        ).to(self.device)
-        self.mll = gpytorch.mlls.ExactMarginalLogLikelihood(self.likelihood, self.gpmodel).to(self.device)
-        self.loss_fn = lambda pred, target: torch.tensor(1).to(self.device)
+        self.gpmodel = ExactGPLayer(train_x=train_x, train_y=train_y, likelihood=self.likelihood, 
+                                    kernel=self.kernel_type).to(self.device)
+        self.loss_fn = gpytorch.mlls.ExactMarginalLogLikelihood(self.likelihood, self.gpmodel).to(self.device)
         
-        self.optimizer = torch.optim.Adam(
-            [{'params': self.gpmodel.parameters(), 'lr': self.args.gpmodel_lr},
-             {'params': self.backbone.parameters(), 'lr': self.args.lr}])
+        self.optimizer = torch.optim.Adam([
+                {'params': self.backbone.parameters(), 'lr': self.args.lr},
+                {'params': self.gpmodel.parameters(), 'lr': self.args.gpmodel_lr}
+        ])
         self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, 
                                                             step_size=self.args.lr_decay_step, 
                                                             gamma=self.args.lr_decay)
@@ -89,49 +85,49 @@ class GPShot(ModelTemplate):
             
             all_h = self.forward(all_x)
             all_h, all_y = self.strategy.update_support_features((all_h, all_y))
-            all_y_onehots = uu.onehot(all_y, fill_with=-1, dim=self.output_dim[self.mode]).split(1,1)
-            
-            self.optimizer.zero_grad()
+            all_y_onehots = uu.onehot(all_y, fill_with=-1, dim=self.output_dim[self.mode])
             
             total_losses =[]
             for idx in range(self.output_dim[self.mode]):
-                self.gpmodel.set_train_data(inputs=all_h, targets=all_y_onehots[idx].squeeze(), strict=False)
+                self.gpmodel.set_train_data(inputs=all_h, targets=all_y_onehots[:, idx], strict=False)
                 output = self.gpmodel(*self.gpmodel.train_inputs)
-                loss = -self.mll(output, self.gpmodel.train_targets)
+                loss = -self.loss_fn(output, self.gpmodel.train_targets)
                 total_losses.append(loss)
             
-            loss = torch.stack(total_losses).sum(0)
-            
-            if len(target_x) > 0:
-#                 with torch.no_grad():
-                self.gpmodel.eval()
-                self.likelihood.eval()
-                self.backbone.eval()
-
-                target_h = self.forward(target_x).detach()
-
-                predictions_list = list()
-                for idx in range(self.output_dim[self.mode]):
-                    self.gpmodel.set_train_data(
-                        inputs=all_h[:support_n], 
-                        targets=all_y_onehots[idx].squeeze()[:support_n],
-                        strict=False)
-                    prediction = self.likelihood(self.gpmodel(target_h))
-                    predictions_list.append(torch.sigmoid(prediction.mean))
-                    
-                predictions_list = torch.stack(predictions_list).T
-                
-                loss *= self.loss_fn(predictions_list, target_y)
-                
-                pred_y = predictions_list.argmax(1)
-                
-                ptracker.add_task_performance(
-                    pred_y.detach().cpu().numpy(),
-                    target_y.detach().cpu().numpy(),
-                    loss.detach().cpu().numpy())
-
+            self.optimizer.zero_grad()
+            loss = torch.stack(total_losses).sum()
             loss.backward()
             self.optimizer.step()
+            
+            if len(target_x) > 0:
+                with torch.no_grad():
+                    self.gpmodel.eval()
+                    self.likelihood.eval()
+                    self.backbone.eval()
+                    
+                    target_h = self.forward(target_x)
+                    
+                    predictions_list = list()
+                    total_losses = list()
+                    for idx in range(self.output_dim[self.mode]):
+                        self.gpmodel.set_train_data(
+                            inputs=all_h[:support_n], 
+                            targets=all_y_onehots[:support_n, idx],
+                            strict=False)
+                        output = self.gpmodel(all_h[support_n:])
+                        total_losses.append(self.loss_fn(output, all_y_onehots[support_n:, idx]))
+                        prediction = self.likelihood(output)
+                        predictions_list.append(torch.sigmoid(prediction.mean))
+                        
+                    predictions_list = torch.stack(predictions_list).T
+                    loss = -torch.stack(total_losses).sum()
+                    
+                    pred_y = predictions_list.argmax(1)
+
+                    ptracker.add_task_performance(
+                        pred_y.detach().cpu().numpy(),
+                        target_y.detach().cpu().numpy(),
+                        loss.detach().cpu().numpy())
             
         
     def forward(self, x):
@@ -149,14 +145,14 @@ class GPShot(ModelTemplate):
         support_h = self.forward(support_x).detach()
         support_h, support_y = self.strategy.update_support_features((support_h, support_y))
         
-        self.support_y_onehots = uu.onehot(support_y, fill_with=-1, dim=self.output_dim[self.mode]).split(1,1)
+        self.support_y_onehots = uu.onehot(support_y, fill_with=-1, dim=self.output_dim[self.mode])
         self.support_h = support_h
     
     def net_eval(self, target_set, ptracker):
         if len(target_set[0]) == 0: return torch.tensor(0.).to(self.device)
         
         target_x, target_y = target_set
-        target_y_onehots = uu.onehot(target_y, fill_with=-1, dim=self.output_dim[self.mode]).split(1,1)
+        target_y_onehots = uu.onehot(target_y, fill_with=-1, dim=self.output_dim[self.mode])
         
         with torch.no_grad():
             self.gpmodel.eval()
@@ -170,17 +166,17 @@ class GPShot(ModelTemplate):
             for idx in range(self.output_dim[self.mode]):
                 self.gpmodel.set_train_data(
                     inputs=self.support_h, 
-                    targets=self.support_y_onehots[idx].squeeze(), 
+                    targets=self.support_y_onehots[:, idx], 
                     strict=False)
-                prediction = self.likelihood(self.gpmodel(target_h))
+                output = self.gpmodel(target_h)
+                prediction = self.likelihood(output)
                 predictions_list.append(torch.sigmoid(prediction.mean))
-                output = self.gpmodel(*self.gpmodel.train_inputs)
-                loss = -self.mll(output, self.gpmodel.train_targets)
+                loss = -self.loss_fn(output, target_y_onehots[:, idx])
                 total_losses.append(loss)
                 
             pred_y = torch.stack(predictions_list).argmax(0)
             loss = torch.stack(total_losses).sum(0)
-
+            
             ptracker.add_task_performance(
                 pred_y.detach().cpu().numpy(),
                 target_y.detach().cpu().numpy(),
