@@ -532,25 +532,29 @@ def strategy_inference(args, expfiles):
     test_settings = [  
         (5, 5,  None, 'balanced', 15, 15, None, 'balanced'),  # K_min, K_max, N_min, I-distribution 
         (4, 6,  None, 'linear', 15, 15, None, 'balanced'),
-        (3, 7,  None, 'linear', 15, 15, None, 'balanced'),
-        (2, 8,  None, 'linear', 15, 15, None, 'balanced'),
-        (1, 9,  None, 'linear', 15, 15, None, 'balanced'),
-        (1, 21,  0.8, 'step', 15, 15, None, 'balanced'),
-        (1, 6,  0.2, 'step', 15, 15, None, 'balanced'),
-        (1, 9,  0.8, 'step', 15, 15, None, 'balanced'),
-        (3, 7,  None, 'random', 15, 15, None, 'balanced'),
         (1, 9,  None, 'random', 15, 15, None, 'balanced'),
         (1, 9,  0.2,  'step', 15, 15, None, 'balanced')       # N_min expressed as a fraction of 'n_way'
+        
+        # Other, uncomment if appropiate
+        # (5, 5,  None, 'balanced', 15, 15, None, 'balanced'),  # K_min, K_max, N_min, I-distribution 
+        # (4, 6,  None, 'linear', 15, 15, None, 'balanced'),
+        # (3, 7,  None, 'linear', 15, 15, None, 'balanced'),
+        # (2, 8,  None, 'linear', 15, 15, None, 'balanced'),
+        # (1, 9,  None, 'linear', 15, 15, None, 'balanced'),
+        # (1, 21,  0.8, 'step', 15, 15, None, 'balanced'),
+        # (1, 6,  0.2, 'step', 15, 15, None, 'balanced'),
+        # (1, 9,  0.8, 'step', 15, 15, None, 'balanced'),
+        # (3, 7,  None, 'random', 15, 15, None, 'balanced'),
     ]
     test_names = make_names(test_settings, n_way)
     
     # Inference Strategies
     strategies = [
 #         'ros',
-#         'ros_aug',
+        'ros_aug',
 #         'weighted_loss',
 #         'focal_loss',
-        'cb_loss',
+#         'cb_loss',
     ]
     
     for experiment in expfiles:
