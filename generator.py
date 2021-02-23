@@ -331,6 +331,17 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
                                'task_args.num_minority_targets',
                                'task_args.imbalance_distribution_targets')] = [train_task]
                     
+                    min_s,max_s,minor,dist = (300, 300, None, 'balanced')
+                    is_baseline = lambda x: x in ['baseline', 'baselinepp', 'knn']
+                    variables.update({
+                        'dataset_args.train.min_num_samples'       :[min_s],
+                        'dataset_args.train.max_num_samples'       :[max_s],
+                        'dataset_args.train.num_minority'          :[minor],
+                        'dataset_args.train.imbalance_distribution':[dist],
+                        'conventional_split'                       :[is_baseline(model)],
+                        'conventional_split_from_train_only'       :[is_baseline(model)]
+                    })
+                    
                     if len(test_tasks) > 0:   # else if no test task is given, assume train task is the same as evaluation task 
                         variables[('task_args.eval.min_num_supports', 
                                    'task_args.eval.max_num_supports',
@@ -776,18 +787,18 @@ if __name__ == '__main__':
     
     if args.models is None or len(args.models) == 0:
         models = [
-#             'protonet',
-#             'relationnet',
-#             'matchingnet',
-#             'dkt',
-#             'simpleshot',
+            'protonet',
+            'relationnet',
+            'matchingnet',
+            'dkt',
+            'simpleshot',
             'baseline',
             'baselinepp',
 #             'knn',
             'maml',
             'protomaml',
-            'bmaml',
-            'bmaml_chaser',
+            # 'bmaml',
+            # 'bmaml_chaser',
             # 'protodkt',
             # 'relationdkt'
             # 'btaml',  # -- left out due to an implementation error
