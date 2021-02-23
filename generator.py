@@ -189,9 +189,16 @@ def generate_experiments(experiment_name_template, variables, default_config, ar
     if '{' in experiment_name_template and '}' in experiment_name_template:
         experiment_name_template = experiment_name_template.replace('.', '_') # dots not allowed in {} of str.format(...)
     
+
+    if isinstance(args.gpu, str):
+        ngpus = 1
+        args.gpu = [args.gpu]
+    else:
+        ngpus = len(args.gpu)
+
     for i_comb, hyperparameters in enumerate(combinations):
-        gpu = args.gpu
-        
+        gpu = args.gpu[i_comb % ngpus]
+
         full_config = substitute_hyperparameters(default_config, hyperparameters)
         
         compressed_config = compress_config(copy.deepcopy(full_config))
@@ -330,7 +337,7 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
                                'task_args.max_num_targets',
                                'task_args.num_minority_targets',
                                'task_args.imbalance_distribution_targets')] = [train_task]
-                    
+
                     min_s,max_s,minor,dist = (300, 300, None, 'balanced')
                     is_baseline = lambda x: x in ['baseline', 'baselinepp', 'knn']
                     variables.update({
@@ -742,7 +749,7 @@ def cub_inference(args, expfiles, save=True):
             
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--gpu', default='{gpu}', help='GPU ID')
+    parser.add_argument('--gpu', default=['{gpu}'], nargs="+", help='GPU ID')
     parser.add_argument('--dummy_run', type=str2bool, nargs='?', const=True, default=False,
                         help='Produces scripts as a "dry run" with a reduced number of tasks, '
                              'and no mobel saving (useful for debugging)')
@@ -809,9 +816,9 @@ if __name__ == '__main__':
     if args.strategies is None or len(args.strategies) == 0:
         strategies = [
             None,
-            'ros',
-            'ros_aug',
-            'freq_ros_aug'
+            # 'ros',
+            # 'ros_aug',
+            # 'freq_ros_aug'
             # 'focal_loss',
             # 'weighted_loss',
             # 'cb_loss'
@@ -822,14 +829,14 @@ if __name__ == '__main__':
     if args.seeds is None or len(args.seeds) == 0:
         seeds = [
             0,
-            1, 
-            2
+            # 1, 
+            # 2
         ]
     else:
         seeds = args.seeds
         
     balanced_tasks = [
-        (5, 5, None, 'balanced', 15, 15, None, 'balanced'),  # Standard Meta-Training
+        # (5, 5, None, 'balanced', 15, 15, None, 'balanced'),  # Standard Meta-Training
 #         (15, 15, None, 'balanced', 15, 15, None, 'balanced'),  # -- uncomment if appropiate
 #         (25, 25, None, 'balanced', 15, 15, None, 'balanced'),  # -- uncomment if appropiate
     ]
