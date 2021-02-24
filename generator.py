@@ -165,7 +165,7 @@ def get_bash_script(exp_kwargs={}):
 
 def generate_experiments(experiment_name_template, variables, default_config, args,
                         config_name='config', script_name='script', log_name='log', save=True):
-                
+    global COUNTER        
     if args.dummy_run:
         variables.update({
                     'num_epochs': [3],
@@ -197,7 +197,8 @@ def generate_experiments(experiment_name_template, variables, default_config, ar
         ngpus = len(args.gpu)
 
     for i_comb, hyperparameters in enumerate(combinations):
-        gpu = args.gpu[i_comb % ngpus]
+        gpu = args.gpu[COUNTER % ngpus]
+        COUNTER+=1
 
         full_config = substitute_hyperparameters(default_config, hyperparameters)
         
@@ -236,7 +237,8 @@ def generate_experiments(experiment_name_template, variables, default_config, ar
         
         if not args.no_log:
             script += ' &> ' + output_path
-        
+        #script += ' & \nP{}=$!'.format(COUNTER)
+
         if save:
             print(script)
             
@@ -377,14 +379,13 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
                     expath += '{model}/'
                     
                     if model in ['protonet', 'protodkt']:
-#                         variables[(
-#                             'task_args.train.num_classes', 
-#                             'task_args.train.min_num_targets',
-#                             'task_args.train.max_num_targets')] = [
-# #                                                                 (20, max(1,int(target_imbalance[0]/3)),
-# #                                                                  int(target_imbalance[1]/3)), 
-#                                                                 (5, 15, 15)
-#                                                               ]
+                        variables[(
+                             'task_args.train.num_classes', 
+                             'task_args.train.min_num_targets',
+                             'task_args.train.max_num_targets')] = [
+                                                                (20, 5, 5), 
+                                                               (5, 15, 15)
+                                                               ]
                         expath += '{task_args.train.num_classes}trainway/'
 
                     elif model in ['baseline', 'baselinepp', 'knn']:
@@ -749,7 +750,7 @@ def cub_inference(args, expfiles, save=True):
             
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--gpu', default=['{gpu}'], nargs="+", help='GPU ID')
+    parser.add_argument('--gpu', default=['{gpu}'], type=str, nargs="*", help='GPU ID')
     parser.add_argument('--dummy_run', type=str2bool, nargs='?', const=True, default=False,
                         help='Produces scripts as a "dry run" with a reduced number of tasks, '
                              'and no mobel saving (useful for debugging)')
@@ -792,6 +793,8 @@ if __name__ == '__main__':
     
     args.results_folder = os.path.abspath(args.results_folder)
     
+    COUNTER = 0    
+
     if args.models is None or len(args.models) == 0:
         models = [
             'protonet',
