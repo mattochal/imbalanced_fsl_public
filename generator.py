@@ -635,14 +635,15 @@ def imbalanced_dataset(args, models=[], seeds=[], save=True, backbone=None):
     
     # meta-training dataset imbalance settings
     imbalance_settings = [
+        (None, None, None, None),
         (300, 300, None, 'balanced'),
-        (30 , 570, None, 'random'),
-        (30 , 570, None, 'linear'),
+        # (30 , 570, None, 'random'),
+        # (30 , 570, None, 'linear'),
         (30 , 570, 0.5,  'step'),
     ]
     
     strategies=[None]
-    train_tasks=[(5, 5, None, 'balanced')]
+    train_tasks=[(5, 5, None, 'balanced', 15, 15, None, 'balanced')]
     var_update = {'num_epochs': [200], 'num_tasks_per_epoch': [250]}
     
     is_baseline = lambda x: x in ['baseline', 'baselinepp', 'knn']
@@ -659,16 +660,23 @@ def imbalanced_dataset(args, models=[], seeds=[], save=True, backbone=None):
         for setting in imbalance_settings:
             min_s, max_s, minor, dist  = setting
             
-            variables = {
-                'dataset_args.train.min_num_samples'       :[min_s],
-                'dataset_args.train.max_num_samples'       :[max_s],
-                'dataset_args.train.num_minority'          :[minor],
-                'dataset_args.train.imbalance_distribution':[dist],
+            if dist is not None:
+                variables = {
+                    'dataset_args.train.min_num_samples'       :[min_s],
+                    'dataset_args.train.max_num_samples'       :[max_s],
+                    'dataset_args.train.num_minority'          :[minor],
+                    'dataset_args.train.imbalance_distribution':[dist],
+                }
+            else:
+                variables = {'dataset_args.train.dataset_version' : 'step-animal'}
+
+            variables.update({
                 'conventional_split'                       :[is_baseline(model)],
                 'conventional_split_from_train_only'       :[is_baseline(model)]
-            }
+            })
             
-            expath = default_config['experiment_name']
+            expath = os.join('imb_mini', '{dataset_args.train.min_num_samples}_{dataset_args.train.max_num_samples}_{dataset_args.train.num_minority}_{dataset_args.train.imbalance_distribution}',
+                default_config['experiment_name'])
             
             experiement_files.extend(generate_experiments(
                 expath, 
@@ -926,15 +934,15 @@ if __name__ == '__main__':
 #             cub_inference(args,expfiles)
         
     
-#     if args.imbalanced_dataset:
-#         expfiles = imbalanced_dataset(args, models=models, seeds=seeds, save=not (args.test or args.inference), 
-#                                         backbone=args.backbone)
+    if args.imbalanced_dataset:
+        expfiles = imbalanced_dataset(args, models=models, seeds=seeds, save=not (args.test or args.inference), 
+                                        backbone=args.backbone)
         
-#         if args.test:
-#             print('Balanced task testing is performed automatically after training. Use --inference to evaluate on CUB.')
+        if args.test:
+            print('Balanced task testing is performed automatically after training. Use --inference to evaluate on CUB.')
         
-#         if args.inference:
-#             cub_inference(args,expfiles)
+        if args.inference:
+            cub_inference(args,expfiles)
             
     
     if not (args.imbalanced_dataset or args.imbalanced_supports or args.imbalanced_targets or args.tailed_dataset):
