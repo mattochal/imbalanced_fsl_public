@@ -270,7 +270,7 @@ def prep_datasets(datasets, general_args, conventional_split=False, from_train_o
     
     if (conventional_split and from_train_only):
         image_data, class_dict, args, dataset_class = datasets['train']
-        new_image_data, new_class_dict, extra_image_data, extra_class_dict = prep_data(image_data, class_dict, args, 
+        new_image_data, new_class_dict = prep_data(image_data, class_dict, args, 
                                                                                        extra_samples=True)
         new_datasets['train'] = dataset_class(new_image_data, new_class_dict, args)
         print("{} dataset contains: {} images, {} classes".format('train', len(new_image_data), len(new_class_dict)))

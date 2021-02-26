@@ -635,11 +635,13 @@ def imbalanced_dataset(args, models=[], seeds=[], save=True, backbone=None):
     
     # meta-training dataset imbalance settings
     imbalance_settings = [
-        (None, None, None, None),
-        (300, 300, None, 'balanced'),
+        # (None, None, None, None),
+        # (300, 300, None, 'balanced'),
         # (30 , 570, None, 'random'),
-        # (30 , 570, None, 'linear'),
-        (30 , 570, 0.5,  'step'),
+         (30 , 570, None, 'linear'),
+        # (30, 570, 0.5, 'step'),
+        # (25, 444, 0.34375,  'step'),
+	
     ]
     
     strategies=[None]
@@ -660,22 +662,23 @@ def imbalanced_dataset(args, models=[], seeds=[], save=True, backbone=None):
         for setting in imbalance_settings:
             min_s, max_s, minor, dist  = setting
             
-            if dist is not None:
+            if True:
                 variables = {
                     'dataset_args.train.min_num_samples'       :[min_s],
                     'dataset_args.train.max_num_samples'       :[max_s],
                     'dataset_args.train.num_minority'          :[minor],
                     'dataset_args.train.imbalance_distribution':[dist],
                 }
-            else:
-                variables = {'dataset_args.train.dataset_version' : 'step-animal'}
+            if dist is None:
+                #print("NOENONEORNEASDFADSAFDSFASDFADFa")
+                variables.update({'dataset_args.train.dataset_version' : ['step-animal']})
 
             variables.update({
                 'conventional_split'                       :[is_baseline(model)],
                 'conventional_split_from_train_only'       :[is_baseline(model)]
             })
             
-            expath = os.join('imb_mini', '{dataset_args.train.min_num_samples}_{dataset_args.train.max_num_samples}_{dataset_args.train.num_minority}_{dataset_args.train.imbalance_distribution}',
+            expath = os.path.join('imb_mini', '{dataset_args.train.min_num_samples}_{dataset_args.train.max_num_samples}_{dataset_args.train.num_minority}_{dataset_args.train.imbalance_distribution}',
                 default_config['experiment_name'])
             
             experiement_files.extend(generate_experiments(
