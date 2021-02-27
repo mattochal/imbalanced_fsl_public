@@ -273,7 +273,8 @@ def make_names(settings, way):
 
     
 def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], test_tasks=[], var_update={}, save=True, 
-                   expfolder='', pretrained_backbone=None, slow_learning=False, dataset = 'mini', backbone='Conv4'):
+                   expfolder='', pretrained_backbone=None, slow_learning=False, dataset = 'mini', backbone='Conv4',
+                   expath_prefix='{dataset}/'):
     
     n_way = 5
     
@@ -340,17 +341,8 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
                                'task_args.max_num_targets',
                                'task_args.num_minority_targets',
                                'task_args.imbalance_distribution_targets')] = [train_task]
-
-                    min_s,max_s,minor,dist = (300, 300, None, 'balanced')
+                    
                     is_baseline = lambda x: x in ['baseline', 'baselinepp', 'knn']
-                    variables.update({
-                        'dataset_args.train.min_num_samples'       :[min_s],
-                        'dataset_args.train.max_num_samples'       :[max_s],
-                        'dataset_args.train.num_minority'          :[minor],
-                        'dataset_args.train.imbalance_distribution':[dist],
-                        'conventional_split'                       :[is_baseline(model)],
-                        'conventional_split_from_train_only'       :[is_baseline(model)]
-                    })
                     
                     if len(test_tasks) > 0:   # else if no test task is given, assume train task is the same as evaluation task 
                         variables[('task_args.eval.min_num_supports', 
@@ -369,7 +361,7 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
                         is_pretrained = 'pretrained_'
                     
                     # experiment path
-                    expath = expfolder + '{dataset}/'+ is_pretrained + '{backbone}/train_on_' + train_name
+                    expath = expfolder + expath_prefix + is_pretrained + '{backbone}/train_on_' + train_name
                     expath += '/{strategy}/'
 #                             '{num_epochs}epochs_{num_tasks_per_epoch}tasks/'
                     
@@ -384,7 +376,7 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
                              'task_args.train.num_classes', 
                              'task_args.train.min_num_targets',
                              'task_args.train.max_num_targets')] = [
-                                                                (20, 5, 5), 
+                                                               # (20, 5, 5), 
                                                                (5, 15, 15)
                                                                ]
                         expath += '{task_args.train.num_classes}trainway/'
@@ -696,37 +688,49 @@ def imbalanced_dataset(args, models=[], seeds=[], save=True, backbone=None):
 
 def tailed_dataset(args, models=[], seeds=[], save=True, backbone='Conv4'):
     
+    
     # meta-training dataset imbalance settings
     datasets = [
-        "metalt",
-        "metabal"
+        "imgnt"
+    ]
+    dataset_versions = [
+        "random",
+        "longtail",
+        "balanced",
     ]
     
     strategies=[None]
     train_tasks=[(5, 5, None, 'balanced', 15, 15, None, 'balanced')]
-    var_update = {'num_epochs': [200], 'num_tasks_per_epoch': [500]}
+    var_update = {'num_epochs': [200], 'num_tasks_per_epoch': [1000]}
     
     experiement_files = []
     
     for dataset in datasets:
-        
-        for experiment in fsl_imbalanced(args, models=models, strategies=strategies, seeds=seeds, var_update=var_update,
-                              train_tasks=train_tasks, save=False, dataset=dataset, backbone=backbone):
+        for version in dataset_versions:
+            for experiment in fsl_imbalanced(args, models=models, strategies=strategies, seeds=seeds, var_update=var_update,
+                                             train_tasks=train_tasks, save=False, dataset=dataset, backbone=backbone, 
+                                             expath_prefix=''):
+                script, script_path, config, config_path = experiment
+                default_config = get_default_config()
+                default_config = substitute_hyperparameters(default_config, config)
+                model = default_config['model']
 
-            script, script_path, config, config_path = experiment
-            default_config = get_default_config()
-            default_config = substitute_hyperparameters(default_config, config)
-            model = default_config['model']
+                expath = os.path.join('{dataset}_{dataset_args.train.dataset_version}/', default_config['experiment_name'])
+
+                experiement_files.extend(generate_experiments(
+                    expath, 
+                    {
+                        "dataset":[dataset],
+                        "dataset_args.dataset_version": [version],
+                        'dataset_args.imbalance_distribution': [None],
+                        "dataset_args.seed": [default_config['seed']],
+                        "backbone":['ResNet10']
+                    }, 
+                    default_config,
+                    args,
+                    save=save
+                ))
             
-            expath = default_config['experiment_name']
-
-            experiement_files.extend(generate_experiments(
-                expath, 
-                {"dataset":[dataset]}, 
-                default_config,
-                args,
-                save=save
-            ))
     return experiement_files
 
             
@@ -787,7 +791,7 @@ if __name__ == '__main__':
     parser.add_argument('--imbalanced_dataset', type=str2bool, nargs='?', const=True, default=False,
                         help='Generate imbalanced dataset experiments')
     parser.add_argument('--tailed_dataset', type=str2bool, nargs='?', const=True, default=False,
-                        help='Generate imbalanced dataset experiments with long-tail distribution')
+                        help='Generate imbalanced dataset experiments with a long-tail distribution')
     parser.add_argument('--dataset', type=str, default='mini')
     parser.add_argument('--slow_learning', type=str, nargs='?', const=True, default=False,
                         help='If true, runs slower learning rate.')
@@ -929,15 +933,15 @@ if __name__ == '__main__':
             print('Strategy inference for imbalnaced target set not yet implemented.')
     
     
-#     if args.tailed_dataset:
-#         expfiles = tailed_dataset(args, models=models, seeds=seeds, save=not (args.test or args.inference), 
-#                                         backbone=args.backbone)
+    if args.tailed_dataset:
+        expfiles = tailed_dataset(args, models=models, seeds=seeds, save=not (args.test or args.inference), 
+                                        backbone=args.backbone)
         
-#         if args.test:
-#             print('Balanced task testing is performed automatically after training. Use --inference to evaluate on CUB.')
+        if args.test:
+            print('Testing is performed automatically after training')
         
-#         if args.inference:
-#             cub_inference(args,expfiles)
+        if args.inference:
+            print('No inference experiments')
         
     
     if args.imbalanced_dataset:

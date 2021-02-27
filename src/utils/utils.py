@@ -37,6 +37,7 @@ from tasks.batch_simple import SimpleBatchTask
 # Datasets
 from datasets.mini import get_MiniImageNet
 from datasets.cub import get_CUB200
+from datasets.imgnt import get_ImageNet
 from datasets.mini_to_cub import get_MiniImageNet_to_CUB200
 from datasets.metabal import get_MetaImageNetBalanced
 from datasets.metalt import get_MetaImageNetLongTail
@@ -77,6 +78,7 @@ TASKS = {
 DATASETS = {
     "mini"       : get_MiniImageNet,
     "cub"        : get_CUB200,
+    "imgnt"      : get_ImageNet,
     "metalt"     : get_MetaImageNetLongTail,
     "metabal"    : get_MetaImageNetBalanced,
     "mini_to_cub": get_MiniImageNet_to_CUB200,
@@ -99,7 +101,7 @@ MODELS = {
     "bmaml"       : BayesianMAML,
     "bmaml_chaser": BayesianMAMLChaser,
     "btaml"       : BayesianTAML,
-    "knn"         : KNN,
+    "knn"         : KNN
 }
 
 BACKBONES = {
