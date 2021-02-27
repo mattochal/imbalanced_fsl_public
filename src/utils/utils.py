@@ -193,8 +193,8 @@ def get_main_parser(optional=None):
                              ' data.dataset_utils.prep_datasets() for details.')
     parser.add_argument('--backbone_channel_dim', type=int, default=64,
                        help='Number of channels of the backbone model.')
-    parser.add_argument('--disable_tqdm', type=str2bool, nargs='?', const=True, default=True,
-                       help="Disable tqdm, especially useful when running experiment and redirecting to files")
+    parser.add_argument('--tqdm', type=str2bool, nargs='?', const=True, default=False,
+                       help="Enable/Disable tqdm, especially useful when running experiment and redirecting to files")
     
     group = parser.add_argument_group('TASK SAMPLING OPTIONS')
     group.add_argument('--num_epochs', type=int, default=100, 
@@ -208,6 +208,8 @@ def get_main_parser(optional=None):
                         help="If present, no (further) training is performed and only the test dataset is evaluated.")
     group.add_argument('--val_or_test',  type=str, choices=["test","val"], default="val", 
                         help="Dataset to perform validation on. Default val")
+    group.add_argument('--no_val_loop',  type=str2bool, nargs='?', const=True, default=False, 
+                        help="No validation loop. Default=False, meaning assume there is a validation loop.")
     group.add_argument('--test_performance_tag', type=str, default="test", 
                         help='The tag name for the performance file evaluated on test set, eg "test" in epoch-###_test.json')
     
@@ -500,9 +502,6 @@ def get_model(backbone, tasks, datasets, stategy, args, device):
         for s in ["train", "val", "test"]:
             output_dims[s] = tasks[s].get_output_dim(args.task_args[s], datasets[s])
         args.model_args['output_dim'] = output_dims
-    
-    if model_name in ['simpleshot'] and args.model_args['disable_tqdm'] is None:
-        args.model_args['disable_tqdm'] = args['disable_tqdm']
         
     if model_name in ['btaml'] and args.model_args['max_shot'] == -1:
         if args.task in ['fsl']:

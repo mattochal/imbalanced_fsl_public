@@ -131,9 +131,10 @@ class ExperimentBuilder():
         
         # Updates best val model if the validation score beats the previous best
         is_val_best_updated = self.ptracker.update_best(checkpointpath, self.state.epoch)['val']
+        is_val_best_updated = is_val_best_updated   # or if no validation
         
-        # Update path_to_best if best updated or no previous path to best
-        if is_val_best_updated or not os.path.isfile(checkpoint_path_to_best):
+        # Update path_to_best if best updated or no previous 'path to best'
+        if is_val_best_updated or self.args.no_val_loop or not os.path.isfile(checkpoint_path_to_best):
             with open(checkpoint_path_to_best,'w') as f:
                 f.write(checkpointpath)
             with open(ptracker_path_to_best,'w') as f:
@@ -156,8 +157,13 @@ class ExperimentBuilder():
             
             current_epoch = self.state.epoch
             previous_epoch = self.state.epoch -1
-            current_best_epoch = self.ptracker.current_best['val']['epoch']
-            previous_best_epoch = self.ptracker.previous_bests['val'][-1]['epoch']
+            
+            if not self.args.no_val_loop:
+                current_best_epoch = self.ptracker.current_best['val']['epoch']
+                previous_best_epoch = self.ptracker.previous_bests['val'][-1]['epoch']
+            else:
+                current_best_epoch = current_epoch
+                previous_best_epoch = previous_epoch
             
             # remove previous epoch checkpoint (unless current best or in allowed epochs)
             if previous_epoch >= 0 and \
@@ -276,7 +282,7 @@ class ExperimentBuilder():
             self.ptracker.set_mode('train')
             
             # train
-            with tqdm.tqdm( initial=0, total=self.args.num_tasks_per_epoch, disable=self.args.disable_tqdm) as train_pbar:
+            with tqdm.tqdm( initial=0, total=self.args.num_tasks_per_epoch, disable=not self.args.tqdm) as train_pbar:
                 for train_sampler in train_generator:
                     dataloader = self.get_dataloader(self.datasets['train'], train_sampler, self.state.epoch, 'train')
                     self.model.meta_train(dataloader, self.ptracker)
@@ -289,7 +295,7 @@ class ExperimentBuilder():
                 self.args.num_tasks_per_validation, 
                 self.state.epoch_seed)
             
-            if self.args.disable_tqdm:
+            if not self.args.tqdm:
                 print('Train phase {} -> {} {}'.format(
                         self.state.epoch, self.ptracker.get_performance_str(), self.model.get_summary_str()))
             
@@ -297,20 +303,23 @@ class ExperimentBuilder():
             
             # simpleshot calc train dataset mean for normalisation during validation
             if self.args.model == 'simpleshot':
-                self.model.set_train_mean(self.datasets['train'], disable_tqdm=self.args.disable_tqdm)
+                self.model.set_train_mean(self.datasets['train'], tqdm=self.args.tqdm)
             
             # validation
-            with tqdm.tqdm( initial=0, total=self.args.num_tasks_per_validation, disable=self.args.disable_tqdm) as pbar_val:
-                for val_sampler in val_generator:
-                    val_dataloader = self.get_dataloader(self.datasets[self.val_or_test], val_sampler, self.state.epoch, 'val')
-                    self.model.meta_val(val_dataloader, self.ptracker)
-                    pbar_val.set_description('Val phase {} -> {} {}'.format(
-                        self.state.epoch, self.ptracker.get_performance_str(), self.model.get_summary_str()))
-                    pbar_val.update(1)
+            if not self.args.no_val_loop:
+                with tqdm.tqdm(initial=0, total=self.args.num_tasks_per_validation, disable=not self.args.tqdm) as pbar_val:
+                    for val_sampler in val_generator:
+                        val_dataloader=self.get_dataloader(self.datasets[self.val_or_test],val_sampler,self.state.epoch,'val')
+                        self.model.meta_val(val_dataloader, self.ptracker)
+                        pbar_val.set_description('Val phase {} -> {} {}'.format(
+                            self.state.epoch, self.ptracker.get_performance_str(), self.model.get_summary_str()))
+                        pbar_val.update(1)
             
-            if self.args.disable_tqdm:
-                print('Val phase {} -> {} {}'.format(
-                        self.state.epoch, self.ptracker.get_performance_str(), self.model.get_summary_str()))
+                if not self.args.tqdm:
+                    print('Val phase {} -> {} {}'.format(
+                            self.state.epoch, self.ptracker.get_performance_str(), self.model.get_summary_str()))
+            else:
+                print("No validation phase; set '--no_val_loop False' ")
             
             converged = self.save_checkpoint()
             self.ptracker.reset_epoch_cache()  # call after save_checkpoint() otherwise performance will be lost
@@ -355,7 +364,7 @@ class ExperimentBuilder():
         
         # Evaluate on test (note: seed set to experiment seed, not epoch seed, which allows for fair evaluation)
         generator = self.get_task_generator('test', self.args.num_tasks_per_testing, self.args.seed)
-        with tqdm.tqdm(total=self.args.num_tasks_per_testing, disable=self.args.disable_tqdm) as pbar_val:
+        with tqdm.tqdm(total=self.args.num_tasks_per_testing, disable=not self.args.tqdm) as pbar_val:
             for sampler in generator:
                 dataloader = self.get_dataloader(self.datasets['test'], sampler, self.state.epoch, 'test')
 
@@ -365,7 +374,7 @@ class ExperimentBuilder():
                                             self.ptracker.get_performance_str(),
                                             self.model.get_summary_str()))
         
-        if self.args.disable_tqdm:
+        if not self.args.tqdm:
             print('Testing ({}) -> {} {}'.format(checkpoint_name,
                                             self.ptracker.get_performance_str(),
                                             self.model.get_summary_str()))

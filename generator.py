@@ -327,7 +327,8 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
                         'dataset'                    : [dataset],
                         'dataset_args.data_path'     : [args.data_path],
                         'dataset_args.train.aug'     : [True],
-                        'ptracker_args.test.metrics' : [['accuracy', 'loss', 'per_cls_stats']]
+                        'ptracker_args.test.metrics' : [['accuracy', 'loss', 'per_cls_stats']],
+                        'tqdm'                       : [False]
                     }
                     variables.update(train_setup)
                     
@@ -635,18 +636,19 @@ def imbalanced_dataset(args, models=[], seeds=[], save=True, backbone=None):
     
     # meta-training dataset imbalance settings
     imbalance_settings = [
-        # (None, None, None, None),
-        # (300, 300, None, 'balanced'),
-        # (30 , 570, None, 'random'),
-         (30 , 570, None, 'linear'),
-        # (30, 570, 0.5, 'step'),
-        # (25, 444, 0.34375,  'step'),
-	
+        (300, 300, None, 'balanced'),
+        (30 , 570, None, 'linear'),
+        (30, 570, 0.5, 'step'),
+        (25, 444, 0.34375,  'step'),
+        (None, None, None, 'step-animal'),
     ]
     
     strategies=[None]
-    train_tasks=[(5, 5, None, 'balanced', 15, 15, None, 'balanced')]
-    var_update = {'num_epochs': [200], 'num_tasks_per_epoch': [250]}
+    train_tasks=[
+        (5, 5, None, 'balanced', 15, 15, None, 'balanced'),
+        # (1, 9, None, 'linear', 15, 15, None, 'balanced')
+    ]
+    var_update = {'num_epochs': [200], 'num_tasks_per_epoch': [500]}
     
     is_baseline = lambda x: x in ['baseline', 'baselinepp', 'knn']
     
@@ -662,20 +664,21 @@ def imbalanced_dataset(args, models=[], seeds=[], save=True, backbone=None):
         for setting in imbalance_settings:
             min_s, max_s, minor, dist  = setting
             
-            if True:
-                variables = {
-                    'dataset_args.train.min_num_samples'       :[min_s],
-                    'dataset_args.train.max_num_samples'       :[max_s],
-                    'dataset_args.train.num_minority'          :[minor],
-                    'dataset_args.train.imbalance_distribution':[dist],
-                }
-            if dist is None:
-                #print("NOENONEORNEASDFADSAFDSFASDFADFa")
+            variables = {}
+            
+            if dist == 'step-animal':
                 variables.update({'dataset_args.train.dataset_version' : ['step-animal']})
+                dist = None
+                
+            variables.update({
+                'dataset_args.train.min_num_samples'       :[min_s],
+                'dataset_args.train.max_num_samples'       :[max_s],
+                'dataset_args.train.num_minority'          :[minor],
+                'dataset_args.train.imbalance_distribution':[dist],
+            })
 
             variables.update({
-                'conventional_split'                       :[is_baseline(model)],
-                'conventional_split_from_train_only'       :[is_baseline(model)]
+                'no_val_loop'                       :[is_baseline(model)],  # no validation loop for those methods
             })
             
             expath = os.path.join('imb_mini', '{dataset_args.train.min_num_samples}_{dataset_args.train.max_num_samples}_{dataset_args.train.num_minority}_{dataset_args.train.imbalance_distribution}',

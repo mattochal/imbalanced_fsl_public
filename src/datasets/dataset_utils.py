@@ -268,10 +268,11 @@ def prep_datasets(datasets, general_args, conventional_split=False, from_train_o
     
     new_datasets = {}
     
-    if (conventional_split and from_train_only):
+    # if True, get val samples from remaining train images if available, do not merge train and val datasets
+    # Validation will be balanced according to the smallest class
+    if (conventional_split and from_train_only): 
         image_data, class_dict, args, dataset_class = datasets['train']
-        new_image_data, new_class_dict = prep_data(image_data, class_dict, args, 
-                                                                                       extra_samples=True)
+        new_image_data,new_class_dict,extra_image_data,extra_class_dict=prep_data(image_data,class_dict,args,extra_samples=True)
         new_datasets['train'] = dataset_class(new_image_data, new_class_dict, args)
         print("{} dataset contains: {} images, {} classes".format('train', len(new_image_data), len(new_class_dict)))
         
@@ -287,6 +288,7 @@ def prep_datasets(datasets, general_args, conventional_split=False, from_train_o
     
     else:
         
+        # if True, combine validation and train together and partition the samples with 80/20 rule or whatever it may be
         if (conventional_split and not from_train_only):
             data1 = datasets['train'][:2]
             data2 = datasets['val'][:2]
@@ -328,7 +330,7 @@ def prep_data(image_data, class_dict, args, extra_samples=False):
         class_labels = sorted(class_labels)
         
         if extra_samples:
-            # Get samples which will be used for validation
+            # Get extra samples which will be used for validation
             min_samples_per_class = min([ len(class_dict[label]) for label in class_labels ])
             extra_sample_per_class = max(0, min_samples_per_class - num_samples.max())
             
