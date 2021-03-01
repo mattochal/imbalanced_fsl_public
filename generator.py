@@ -704,7 +704,7 @@ def tailed_dataset(args, models=[], seeds=[], save=True, backbone='Conv4'):
         "imgnt"
     ]
     dataset_versions = [
-        "random",
+        # "random",
         "longtail",
         "balanced",
     ]
@@ -720,7 +720,7 @@ def tailed_dataset(args, models=[], seeds=[], save=True, backbone='Conv4'):
     for dataset in datasets:
         for version in dataset_versions:
             for experiment in fsl_imbalanced(args, models=models, strategies=strategies, seeds=seeds, var_update=var_update,
-                                             train_tasks=train_tasks, save=False, dataset=dataset, backbone=backbone, 
+                                             train_tasks=train_tasks, save=False, dataset=dataset, backbone='ResNet10', 
                                              expath_prefix=''):
                 script, script_path, config, config_path = experiment
                 default_config = get_default_config()
@@ -736,7 +736,6 @@ def tailed_dataset(args, models=[], seeds=[], save=True, backbone='Conv4'):
                         "dataset_args.dataset_version": [version],
                         'dataset_args.imbalance_distribution': [None],
                         "dataset_args.seed": [default_config['seed']],
-                        "backbone":['ResNet10'],
                         'no_val_loop'                       :[is_baseline(model)],
                         'conventional_split'                :[False],
                         'conventional_split_from_train_only':[False]
