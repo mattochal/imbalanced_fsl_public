@@ -303,6 +303,7 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
          'model_args.lr_decay_step'   : [25],
         }
     
+    is_baseline = lambda x: x in ['baseline', 'baselinepp', 'knn']
     
     experiement_files = []
     for seed in seeds:
@@ -342,7 +343,13 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
                                'task_args.num_minority_targets',
                                'task_args.imbalance_distribution_targets')] = [train_task]
                     
-                    is_baseline = lambda x: x in ['baseline', 'baselinepp', 'knn']
+                    if is_baseline(model):
+                        variables.update({
+                            'no_val_loop'                       :[False],
+                            'conventional_split'                :[True],
+                            'conventional_split_from_train_only':[False],
+                        })
+                    
                     
                     if len(test_tasks) > 0:   # else if no test task is given, assume train task is the same as evaluation task 
                         variables[('task_args.eval.min_num_supports', 
@@ -668,10 +675,13 @@ def imbalanced_dataset(args, models=[], seeds=[], save=True, backbone=None):
                 'dataset_args.train.num_minority'          :[minor],
                 'dataset_args.train.imbalance_distribution':[dist],
             })
-
-            variables.update({
-                'no_val_loop'                       :[is_baseline(model)],  # no validation loop for those methods
-            })
+            
+            if is_baseline(model):
+                variables.update({
+                    'no_val_loop'                       :[True],  # no validation loop for baselines
+                    'conventional_split'                :[False],
+                    'conventional_split_from_train_only':[False],
+                })
             
             expath = os.path.join('imb_mini', '{dataset_args.train.min_num_samples}_{dataset_args.train.max_num_samples}_{dataset_args.train.num_minority}_{dataset_args.train.imbalance_distribution}',
                 default_config['experiment_name'])
@@ -703,6 +713,8 @@ def tailed_dataset(args, models=[], seeds=[], save=True, backbone='Conv4'):
     train_tasks=[(5, 5, None, 'balanced', 15, 15, None, 'balanced')]
     var_update = {'num_epochs': [200], 'num_tasks_per_epoch': [1000]}
     
+    is_baseline = lambda x: x in ['baseline', 'baselinepp', 'knn']
+    
     experiement_files = []
     
     for dataset in datasets:
@@ -724,7 +736,10 @@ def tailed_dataset(args, models=[], seeds=[], save=True, backbone='Conv4'):
                         "dataset_args.dataset_version": [version],
                         'dataset_args.imbalance_distribution': [None],
                         "dataset_args.seed": [default_config['seed']],
-                        "backbone":['ResNet10']
+                        "backbone":['ResNet10'],
+                        'no_val_loop'                       :[is_baseline(model)],
+                        'conventional_split'                :[False],
+                        'conventional_split_from_train_only':[False]
                     }, 
                     default_config,
                     args,

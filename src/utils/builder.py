@@ -303,7 +303,7 @@ class ExperimentBuilder():
             
             # simpleshot calc train dataset mean for normalisation during validation
             if self.args.model == 'simpleshot':
-                self.model.set_train_mean(self.datasets['train'], tqdm=self.args.tqdm)
+                self.model.set_train_mean(self.datasets['train'], istqdm=self.args.tqdm)
             
             # validation
             if not self.args.no_val_loop:

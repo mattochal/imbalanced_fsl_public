@@ -125,7 +125,7 @@ class SimpleShot(ModelTemplate):
         self.strategy.reset()
         self.proto_memory = dict()
         
-    def set_train_mean(self, dataset, tqdm=False):
+    def set_train_mean(self, dataset, istqdm=False):
         if not self.update_train_mean: return 
         self.eval()
         
@@ -134,10 +134,10 @@ class SimpleShot(ModelTemplate):
             length = int(length * 0.05)
         
         with torch.no_grad():
-            pbar = tqdm.tqdm(initial=0, total=length, disable=not tqdm)
+            pbar = tqdm.tqdm(initial=0, total=length, disable=(not istqdm))
             pbar.set_description("Calculating train mean")
             
-            if not tqdm:
+            if not istqdm:
                 print("Calculating train mean")
 
             batch_size = 64
