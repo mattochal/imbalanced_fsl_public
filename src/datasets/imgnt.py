@@ -15,7 +15,10 @@ def get_ImageNet(args_per_set, setnames=["train", "val", "test"]):
             
         data_path = os.path.abspath(args.data_path)
         version = args.dataset_version if setname == 'train' else 'balanced'
-        filepath = os.path.join(data_path, "imgnt", "imgnt-{0}-cache-{1}.pkl".format(version,setname))
+        if version == 'random':
+            filepath = os.path.join(data_path, "imgnt", "imgnt-{0}-{1}-cache-{2}.pkl".format(version,args.seed,setname))
+        else:
+            filepath = os.path.join(data_path, "imgnt", "imgnt-{0}-cache-{1}.pkl".format(version,setname))
         data = load_dataset_from_pkl(filepath)
         dataset_class = ColorDatasetInMemory
         datasets[setname] = [data['image_data'], data['class_dict'], args, dataset_class]

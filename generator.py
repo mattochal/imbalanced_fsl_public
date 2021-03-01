@@ -704,9 +704,9 @@ def tailed_dataset(args, models=[], seeds=[], save=True, backbone='Conv4'):
         "imgnt"
     ]
     dataset_versions = [
-        # "random",
-        "longtail",
-        "balanced",
+        "random",
+        #"longtail",
+        #"balanced",
     ]
     
     strategies=[None]
