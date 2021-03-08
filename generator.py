@@ -636,23 +636,23 @@ def imbalanced_dataset(args, models=[], seeds=[], save=True, backbone=None):
     # meta-training dataset imbalance settings
     imbalance_settings = [
         #(300, 300, None, 'balanced'),
-        #(30 , 570, None, 'linear'),
-        #(30, 570, 0.5, 'step'),
-        #(25, 444, 0.34375,  'step'),
-        #(None, None, None, 'step-animal'),
+        (30 , 570, None, 'linear'),
+        (30, 570, 0.5, 'step'),
+        # (25, 444, 0.34375,  'step'),
+        # (None, None, None, 'step-animal'),
         
-        (150, 150, None, 'balanced'),
-        (30, 190, 0.25, 'step'),
-        (30, 270,  0.5, 'step'),
-        (30, 510, 0.75, 'step'),
+        #(150, 150, None, 'balanced'),
+        #(30, 190, 0.25, 'step'),
+        #(30, 270,  0.5, 'step'),
+        #(30, 510, 0.75, 'step'),
     ]
     
     strategies=[None]
     train_tasks=[
-        (5, 5, None, 'balanced', 15, 15, None, 'balanced'),
-        # (1, 9, None, 'linear', 15, 15, None, 'balanced')
+#         (5, 5, None, 'balanced', 15, 15, None, 'balanced'),
+        (1, 9, None, 'linear', 15, 15, None, 'balanced')
     ]
-    var_update = {'num_epochs': [200], 'num_tasks_per_epoch': [125], 'dataset_args.train.use_classes_frac': [0.5]}
+    var_update = {'num_epochs': [200], 'num_tasks_per_epoch': [500], 'dataset_args.train.use_classes_frac': [0.5]}
     
     is_baseline = lambda x: x in ['baseline', 'baselinepp', 'knn']
     
@@ -835,15 +835,15 @@ if __name__ == '__main__':
     if args.models is None or len(args.models) == 0:
         models = [
             'protonet',
-            'relationnet',
-            'matchingnet',
-            'dkt',
-            'simpleshot',
-            'baseline',
-            'baselinepp',
-#             'knn',
             'maml',
+            'dkt',
+            'baseline',
             'protomaml',
+            'relationnet',
+            'baselinepp',
+            'matchingnet',
+            'simpleshot',
+#             'knn',
             # 'bmaml',
             # 'bmaml_chaser',
             # 'protodkt',
