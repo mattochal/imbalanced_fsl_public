@@ -39,8 +39,6 @@ from datasets.mini import get_MiniImageNet
 from datasets.cub import get_CUB200
 from datasets.imgnt import get_ImageNet
 from datasets.mini_to_cub import get_MiniImageNet_to_CUB200
-from datasets.metabal import get_MetaImageNetBalanced
-from datasets.metalt import get_MetaImageNetLongTail
 from datasets.custom import get_custom_dataset_from_folders
 from datasets.dataset_utils import prep_datasets
 
@@ -64,7 +62,6 @@ from models.relationdkt import RelationDKT
 # Imbalance Strategies
 from strategies.ros import ROS
 from strategies.ros_aug import ROS_AUG
-from strategies.freq_ros_aug import FREQ_ROS_AUG,FREQ_ROS_AUG2,FREQ_ROS_AUG3,FREQ_ROS_AUG4,FREQ_ROS_AUG5
 from strategies.focal_loss import FocalLoss
 from strategies.weighted_loss import WeightedLoss
 from strategies.cb_loss import CBLoss
@@ -79,8 +76,6 @@ DATASETS = {
     "mini"       : get_MiniImageNet,
     "cub"        : get_CUB200,
     "imgnt"      : get_ImageNet,
-    "metalt"     : get_MetaImageNetLongTail,
-    "metabal"    : get_MetaImageNetBalanced,
     "mini_to_cub": get_MiniImageNet_to_CUB200,
     "custom"     : get_custom_dataset_from_folders
 }
@@ -115,16 +110,11 @@ BACKBONES = {
 }
 
 STRATEGIES = {
-    "ros"          : ROS,
-    "ros_aug"      : ROS_AUG,
-    "weighted_loss": WeightedLoss,
-    "focal_loss"   : FocalLoss,
-    "cb_loss"      : CBLoss,
-    "freq_ros_aug" : FREQ_ROS_AUG,
-    "freq_ros_aug2" : FREQ_ROS_AUG2,
-    "freq_ros_aug3" : FREQ_ROS_AUG3,
-    "freq_ros_aug4" : FREQ_ROS_AUG4,
-    "freq_ros_aug5" : FREQ_ROS_AUG5,
+    "ros"           : ROS,
+    "ros_aug"       : ROS_AUG,
+    "weighted_loss" : WeightedLoss,
+    "focal_loss"    : FocalLoss,
+    "cb_loss"       : CBLoss,
     None           : StrategyTemplate
 }
 
@@ -281,9 +271,20 @@ def get_raw_args(parser, stdin_list=None, args_dict=dict()):
     args_vars.update(args_dict)
     
     stdin_list = sys.argv if stdin_list is None else stdin_list
-    stdin_list_keys = [arg[2:] for arg in stdin_list if arg.startswith("--") \
-                       and arg not in ["--dataset_args", "--model_args", "--task_args", "--ptracker_args", "--strategy_args"]]
+    stdin_list_keys = [arg[2:] for arg in stdin_list if str(arg).startswith("--")]
+    stdin_list_keys = [arg for arg in stdin_list_keys if arg not in ["dataset_args", "model_args", "task_args", 
+                                                                     "ptracker_args", "strategy_args"]]
     
+    if args.args_file in ["None", None, ""] and args.continue_from is not ["None", None, ""]:
+        if os.path.isfile(args.continue_from):
+            folder = os.path.basename(os.path.basename(args.continue_from))
+        else:
+            folder = args.continue_from
+        
+        config_files = [f for f in os.listdir(folder) if os.path.isfile(os.path.join(folder, f))]
+        config_files = list(sorted(config_files))
+        args.args_file = os.path.join(folder, config_files[-1]) # latest config file
+        
     # Update args from file if available
     if args.args_file not in ["None", None, ""]: 
         

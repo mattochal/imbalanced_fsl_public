@@ -10,6 +10,8 @@ import random
 from typing import Sequence
 import random
 import copy
+import hashlib
+
 
 from datasets.dataset_utils import ImageJitter, MyRotateTransform, color_transform, mono_transform, UnNormalize, Normalize, partial_shuffle, swap, load_dataset_from_pkl
 
@@ -30,6 +32,9 @@ class DatasetTemplate(Dataset):
         self.data_len =  len(self.image_data)
         self.transform = color_transform(self.augment, args.normalise, self.image_width, self.image_height)
         self.raw_transform = color_transform(False, args.normalise, self.image_width, self.image_height)
+        self.hash_signature = hashlib.md5(str.encode(" ".join([
+            self.inv_class_dict[i] for i in range(self.data_len)
+        ])))
     
     def __len__(self):
         return self.data_len
@@ -81,6 +86,10 @@ class DatasetTemplate(Dataset):
             selected = self.class_dict_cache[class_id][:n]
             self.class_dict_cache[class_id] = self.class_dict_cache[class_id][n:]
             return selected
+        
+    def get_signature(self):
+        return self.hash_signature.hexdigest()
+        
             
     
 class ColorDatasetInMemory(DatasetTemplate):
