@@ -275,7 +275,7 @@ def get_raw_args(parser, stdin_list=None, args_dict=dict()):
     stdin_list_keys = [arg for arg in stdin_list_keys if arg not in ["dataset_args", "model_args", "task_args", 
                                                                      "ptracker_args", "strategy_args"]]
     
-    if args.args_file in ["None", None, ""] and args.continue_from is not ["None", None, ""]:
+    if args.args_file in ["None", None, ""] and args.continue_from not in ["None", None, ""]:
         if os.path.isfile(args.continue_from):
             folder = os.path.basename(os.path.basename(args.continue_from))
         else:
