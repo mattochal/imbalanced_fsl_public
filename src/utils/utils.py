@@ -481,8 +481,7 @@ def get_backbone(args, device):
     if model_name in ["maml", "protomaml", "oml"]:
         return BACKBONES[backbone_name](device, maml=True, outdim=args.backbone_channel_dim)
     
-    if model_name in ["btaml"] and backbone_name in ["Conv4", "Conv6"]:
-        args.backbone_channel_dim = 32
+    if model_name in ["btaml"]:
         return BACKBONES[backbone_name](device, maml=True, outdim=args.backbone_channel_dim)
         
     return BACKBONES[backbone_name](device, outdim=args.backbone_channel_dim)
@@ -506,7 +505,7 @@ def get_model(backbone, tasks, datasets, stategy, args, device):
             output_dims[s] = tasks[s].get_output_dim(args.task_args[s], datasets[s])
         args.model_args['output_dim'] = output_dims
         
-    if model_name in ['btaml'] and args.model_args['max_shot'] == -1:
+    if model_name in ['btaml']:
         if args.task in ['fsl']:
             maxshot = max([args.task_args[setname].num_supports for setname in ['train', 'test', 'val']])
         if args.task in ['fsl_imbalanced']:

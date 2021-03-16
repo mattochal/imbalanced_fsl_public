@@ -418,17 +418,15 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
 #                         expath += '/'
                         
                     elif model == 'btaml':
-                        variables['backbone_channel_dim'] = [32]
-                        variables['model_args.lr'] = [0.0001]
-                        variables[('model_args.approx','model_args.approx_until')] = [(True,0)]
+                        variables['model_args.approx'] = [False]
                         variables['model_args.batch_size'] = [4]
-                        variables['model_args.inner_loop_lr'] = [0.1]
-                        variables['model_args.num_inner_loop_steps'] = [10]
+                        variables['model_args.inner_loop_lr'] = [0.01]
+                        variables['model_args.num_inner_loop_steps'] = [{"train":4, "val":10, "test":10}]
                         variables[('model_args.alpha_on', 
                                    'model_args.omega_on',
                                    'model_args.gamma_on',
                                    'model_args.z_on')] = [(True, True, True, True)]
-                        expath += '{backbone_channel_dim}backbonedims/'
+#                         expath += '{backbone_channel_dim}backbonedims/'
 #                         expath += "{model_args.alpha_on}a_{model_args.omega_on}o_" + \
 #                                    "{model_args.gamma_on}g_" + \
 #                                    "{model_args.z_on}z_{model_args.approx_until}till/"
@@ -834,21 +832,21 @@ if __name__ == '__main__':
 
     if args.models is None or len(args.models) == 0:
         models = [
-            'protonet',
-            'maml',
-            'dkt',
-            'baseline',
-            'protomaml',
-            'relationnet',
-            'baselinepp',
-            'matchingnet',
-            'simpleshot',
+#             'protonet',
+#             'maml',
+#             'dkt',
+#             'baseline',
+#             'protomaml',
+#             'relationnet',
+#             'baselinepp',
+#             'matchingnet',
+#             'simpleshot',
 #             'knn',
             # 'bmaml',
             # 'bmaml_chaser',
             # 'protodkt',
             # 'relationdkt'
-            # 'btaml',  # -- left out due to an implementation error
+            'btaml', 
         ]
     else:
         models = args.models
@@ -856,8 +854,8 @@ if __name__ == '__main__':
     if args.strategies is None or len(args.strategies) == 0:
         strategies = [
             None,
-            # 'ros',
-            # 'ros_aug',
+            'ros',
+            'ros_aug',
             # 'freq_ros_aug'
             # 'focal_loss',
             # 'weighted_loss',
@@ -876,13 +874,13 @@ if __name__ == '__main__':
         seeds = args.seeds
         
     balanced_tasks = [
-        # (5, 5, None, 'balanced', 15, 15, None, 'balanced'),  # Standard Meta-Training
+        (5, 5, None, 'balanced', 15, 15, None, 'balanced'),  # Standard Meta-Training
 #         (15, 15, None, 'balanced', 15, 15, None, 'balanced'),  # -- uncomment if appropiate
 #         (25, 25, None, 'balanced', 15, 15, None, 'balanced'),  # -- uncomment if appropiate
     ]
     
     imbalanced_tasks = [
-#         (1, 9, None, 'unbiased', 15, 15, None, 'balanced'),   # Unbiased-Random Meta-Training
+#         (1, 9, None, 'dunbiased', 15, 15, None, 'balanced'),   # Unbiased-Random Meta-Training
         (1, 9, None, 'random', 15, 15, None, 'balanced'),   # Random-Shot Meta-Training
         
 #         (1, 29, None, 'random', 15, 15, None, 'balanced'),  # -- uncomment if appropiate
@@ -930,10 +928,10 @@ if __name__ == '__main__':
     if args.imbalanced_targets:
         # Standard meta-training
         train_tasks = [
-            (5, 5, None, 'balanced', 15, 15, None, 'balanced'),
-            (5, 5, None, 'balanced', 1, 29, None, 'linear'),
-            (1, 9, None, 'linear', 15, 15, None, 'balanced'),
-            (1, 9, None, 'linear', 1, 29, None, 'linear'),
+            (5, 5, None, 'balanced', 5, 5, None, 'balanced'),
+            (5, 5, None, 'balanced', 1, 9, None, 'linear'),
+            (1, 9, None, 'linear', 5, 5, None, 'balanced'),
+            (1, 9, None, 'linear', 1, 9, None, 'linear'),
         ]
         
         test_tasks = [
