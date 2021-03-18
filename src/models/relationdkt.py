@@ -1,6 +1,6 @@
 from models.protonet import ProtoNet
 import torch.nn as nn
-import models.backbones as backbones 
+from backbones.layers import init_layer
 import torch
 import torch.nn.functional as F
 import pprint
@@ -275,7 +275,7 @@ class RelationConvBlock(nn.Module):
         self.parametrized_layers = [self.C, self.BN, self.relu, self.pool]
 
         for layer in self.parametrized_layers:
-            backbones.init_layer(layer)
+            init_layer(layer)
 
         self.trunk = nn.Sequential(*self.parametrized_layers)
 

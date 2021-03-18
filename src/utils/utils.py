@@ -24,7 +24,8 @@ import numpy as np
 from utils.ptracker import PerformanceTracker
 
 # Backbones
-import models.backbones as backbones
+from backbones.conv import Conv4, Conv6, Conv4NP, Conv6NP
+from backbones.resnet import ResNet10, ResNet18, ResNet34, ResNet50, ResNet101
 
 # Imbalance Distributions
 from tasks.imbalance_utils import IMBALANCE_DIST
@@ -100,13 +101,13 @@ MODELS = {
 }
 
 BACKBONES = {
-    "Conv4"    : backbones.Conv4,
-    "Conv6"    : backbones.Conv6,
-    "ResNet10" : backbones.ResNet10,
-    "ResNet18" : backbones.ResNet18,
-    "ResNet34" : backbones.ResNet34,
-    "ResNet50" : backbones.ResNet50,
-    "ResNet101": backbones.ResNet101
+    "Conv4"    : Conv4,
+    "Conv6"    : Conv6,
+    "ResNet10" : ResNet10,
+    "ResNet18" : ResNet18,
+    "ResNet34" : ResNet34,
+    "ResNet50" : ResNet50,
+    "ResNet101": ResNet101
 }
 
 STRATEGIES = {
@@ -472,16 +473,11 @@ def get_backbone(args, device):
     
     if model_name in ["relationnet", "relationdkt"]:
         if backbone_name == "Conv4":
-            return backbones.Conv4NP(device, outdim=args.backbone_channel_dim)
-        if backbone_name == "Conv4S":
-            return backbones.Conv4SNP(device, outdim=args.backbone_channel_dim)
+            return Conv4NP(device, outdim=args.backbone_channel_dim)
         if backbone_name == "Conv6":
-            return backbones.Conv6NP(device, outdim=args.backbone_channel_dim)
+            return Conv6NP(device, outdim=args.backbone_channel_dim)
     
-    if model_name in ["maml", "protomaml", "oml"]:
-        return BACKBONES[backbone_name](device, maml=True, outdim=args.backbone_channel_dim)
-    
-    if model_name in ["btaml"]:
+    if model_name in ["maml", "protomaml", "btaml"]:
         return BACKBONES[backbone_name](device, maml=True, outdim=args.backbone_channel_dim)
         
     return BACKBONES[backbone_name](device, outdim=args.backbone_channel_dim)

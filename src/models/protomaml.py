@@ -4,7 +4,6 @@ from torch.autograd import Variable
 import numpy as np
 import torch.nn.functional as F
 from models.maml import Maml
-import models.backbones as backbones
 import copy
 import argparse
 

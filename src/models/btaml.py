@@ -4,7 +4,7 @@ from torch.autograd import Variable
 import numpy as np
 import torch.nn.functional as F
 from models.model_template import ModelTemplate
-import models.backbones as backbones
+from backbones.layers import Linear_fw
 import utils.utils as utils
 import copy
 import argparse
@@ -74,7 +74,7 @@ class BayesianTAML(ModelTemplate):
         self.optimizer.step()
         
     def setup_classifier(self, output_dim):
-        classifier = backbones.Linear_fw(self.backbone.final_feat_dim, output_dim).to(self.device)
+        classifier = Linear_fw(self.backbone.final_feat_dim, output_dim).to(self.device)
         classifier.bias.data.fill_(0)
         return classifier
         
