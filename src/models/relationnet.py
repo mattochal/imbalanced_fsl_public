@@ -14,7 +14,8 @@ import argparse
 class RelationNet(ProtoNet):
     
     @staticmethod
-    def get_parser(parser = argparse.ArgumentParser(description='RelationNet')):
+    def get_parser(parser=None):
+        if parser is None: parser = argparse.ArgumentParser(description='RelationNet')
         parser = ProtoNet.get_parser(parser)
         parser.add_argument('--loss_type', type=str, choices=['mse', 'softmax'], default='mse')
         return parser

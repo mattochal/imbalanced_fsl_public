@@ -3,7 +3,8 @@ import argparse
 class TaskTemplate():
     
     @staticmethod
-    def get_parser(parser=argparse.ArgumentParser()):
+    def get_parser(parser=None):
+        if parser is None: parser=argparse.ArgumentParser()
         return parser
     
     @staticmethod

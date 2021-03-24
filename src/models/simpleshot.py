@@ -55,7 +55,8 @@ def unfreeze_model(model):
 class SimpleShot(ModelTemplate):
     
     @staticmethod
-    def get_parser(parser = argparse.ArgumentParser(description='Baseline/Baseline++')):
+    def get_parser(parser=None):
+        if parser is None: parser = argparse.ArgumentParser(description='SimpleShot')
         """
         returns a parser for the given model. Can also return a subparser
         """

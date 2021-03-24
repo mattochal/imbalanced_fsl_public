@@ -10,7 +10,7 @@ import datetime
 
 from utils.ptracker import PerformanceTracker
 from utils.dataloader import DataLoader
-from utils.utils import find, toBunch
+from utils.utils import find
 from tasks.task_generator import TaskGenerator
 
 
@@ -72,7 +72,7 @@ class ExperimentBuilder():
         
         # Save args into a file
         with open(config_path, 'w') as f:
-            json.dump(json.loads(str(self.args)), f, indent=2, sort_keys=True)
+            json.dump(self.args, f, indent=2, sort_keys=True)
     
     
     def load_from_checkpoint(self, checkpoint_name_or_path, load_model_only=False, load_backbone_only=False):
@@ -152,7 +152,7 @@ class ExperimentBuilder():
         self.ptracker.save_logfile(performance_logfile, ['train', 'val'])
         
         # Delete checkpoints due to heavy storage
-        if self.args.model in ['matchingnet','btaml'] or 'ResNet' in self.args.backbone or self.args.storage_friendly:
+        if (self.args.model in ['matchingnet','btaml']) or ('ResNet' in self.args.backbone) or self.args.storage_friendly:
             in_allowed_epochs = lambda x: x % 40 == 19  # allowed every 40th epoch, e.i. at 19th, 59th, 99th etc..
             
             current_epoch = self.state.epoch

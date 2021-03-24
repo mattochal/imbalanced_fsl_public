@@ -8,7 +8,8 @@ from tasks.imbalance_utils import get_num_samples_per_class, IMBALANCE_DIST
 class ImbalancedFSLTask(TaskTemplate):
     
     @staticmethod
-    def get_parser(parser=argparse.ArgumentParser()):
+    def get_parser(parser=None):
+        if parser is None: parser=argparse.ArgumentParser()
         parser.add_argument('--num_classes', type=int, default=5, 
                             help="Number of classes per episode (n-way).")
         
