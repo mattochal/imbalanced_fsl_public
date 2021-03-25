@@ -23,7 +23,7 @@ if __name__ == '__main__':
     print(" ----------------- FULL ARGS (COMPACT) ----------------")
     pprint.pprint(compressed_args, indent=2)
     print(" ------------------------------------------------------")
-    print(" ------------ EXCLUDED (UNRECOGNISED) ARGS ------------")
+    print(" ------------------ UNRECOGNISED ARGS -----------------")
     pprint.pprint(excluded_args, indent=2)
     print(" ------------------------------------------------------")
     

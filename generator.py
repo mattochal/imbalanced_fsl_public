@@ -107,7 +107,7 @@ def generate_experiments(name_template,
                     'num_tasks_per_testing': [3]
         })
         if ('model' in variables and variables['model'] == 'simpleshot') or \
-           ('model' in default_config and default_config['model'] == 'simpleshot'):
+           (default_config is not None and 'model' in default_config and default_config['model'] == 'simpleshot'):
             variables['model_args.approx_train_mean'] = [True]
     
     scripts = []
