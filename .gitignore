@@ -12,3 +12,5 @@ job_utils/
 visualiser.ipynb
 vistools/
 demo_fsl*
+unittests/
+myparser.py

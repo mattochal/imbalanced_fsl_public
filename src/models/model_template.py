@@ -12,6 +12,7 @@ class ModelTemplate(nn.Module):
         Return model subparser for model dependent hyperparameters / arguments found in self.args variable
         """
         if parser is None: parser = argparse.ArgumentParser()
+        parser.add_argument('--seed', type=int, default=-1, help='seed, if -1 set in code')
         parser.add_argument('--lr', type=float, default=0.001, help='learning rate')
         parser.add_argument('--lr_decay', type=float, default=1.0,help='learning rate decay')
         parser.add_argument('--lr_decay_step', type=float, default=1, help='learning rate decay step size')

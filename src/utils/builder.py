@@ -201,7 +201,7 @@ class ExperimentBuilder():
         print('Continuing from', self.args.continue_from)
         
         if self.args.continue_from in [None, 'None', 'from_scratch'] or self.args.dummy_run:
-            return False  
+            return   
         
         if self.args.continue_from == 'latest':
             checkpoint_names = find('epoch*', self.checkpoint_folder)
@@ -236,7 +236,10 @@ class ExperimentBuilder():
             print('FILE', filename)
             self.load_from_checkpoint(filename, load_model_only=True, load_backbone_only=self.args.load_backbone_only)
         
-        return True
+        if not self.args.load_backbone_only: # since otherwise we want to start from epoch 0
+            self.ptracker.reset_epoch_cache()
+            self.state.next_epoch()
+            self.model.next_epoch()
     
     
     def get_task_generator(self, set_name, num_tasks, seed):
@@ -255,21 +258,13 @@ class ExperimentBuilder():
         return DataLoader(dataset, sampler, self.device, epoch, mode)
     
     
-    def run_experiment(self):
+    def train_model(self):
         """
         Runs the main thread of the experiment
         """
         
-        continue_from_next_epoch = self.load_pretrained()
-        
         if self.args.evaluate_on_test_set_only:
-            self.evaluate_on_test()
             return
-        
-        if continue_from_next_epoch and not self.args.load_backbone_only:
-            self.ptracker.reset_epoch_cache()
-            self.state.next_epoch()
-            self.model.next_epoch()
         
         converged = False if self.args.num_epochs is None else self.state.epoch >= self.args.num_epochs
         
@@ -320,23 +315,22 @@ class ExperimentBuilder():
                             self.state.epoch, self.ptracker.get_performance_str(), self.model.get_summary_str()))
             else:
                 print("No validation phase; set '--no_val_loop False' ")
-            
+                
             converged = self.save_checkpoint()
             self.ptracker.reset_epoch_cache()  # call after save_checkpoint() otherwise performance will be lost
             self.state.next_epoch()
             self.model.next_epoch()
             print()
+        
         print()
         
-        # Evaluate the best model on test dataset
-        self.evaluate_best_model()
         
         
-    def evaluate_best_model(self):
+    def evaluate_model(self):
         """
         Evaluate final performance on the best model
         """
-        if self.args.dummy_run:
+        if self.args.dummy_run or self.args.evaluate_on_test_set_only:
             self.evaluate_on_test()
             return
             

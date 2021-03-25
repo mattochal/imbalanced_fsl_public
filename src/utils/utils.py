@@ -463,6 +463,9 @@ def get_model(backbone, tasks, datasets, stategy, args, device):
     if args.model not in MODELS:
         raise Exception("Model {} does not exist".format(args.model))
     
+    if 'seed' in args.model_args and args.model_args.seed == -1:
+        args.model_args.seed = args.seed
+    
     if args.model in ["baseline", "baselinepp", "maml", "gpshot", "dkt", 
                       "relationdkt", "protomaml", "knn", "simpleshot",
                      "bmaml", "bmaml_chaser", "btaml", "btaml_star", "protodkt"]:
@@ -504,16 +507,6 @@ def compress_args(args, parser=None):
             compressed_args[k] = compress_three_phase(compressed_args[k])
     
     return compressed_args
-
-def compress_and_print_args(args, parser):
-    """
-    Prints args in a more compact form
-    """
-    compressed_args = compress_args(bunch.unbunchify(args))
-    
-    print(" ---------- FULL ARGS (COMPACT) ---------")
-    pprint.pprint(compressed_args, indent=2)
-    print(" ----------------------------------------")
     
 
 def torch_summarize(model, show_weights=True, show_parameters=True):

@@ -834,7 +834,7 @@ if __name__ == '__main__':
         # Random Shot meta-training
         randomshot_expfiles = fsl_imbalanced(g_args, models=models, strategies=strategies, seeds=seeds,
                                              train_tasks=imbalanced_tasks, save=not (g_args.test or g_args.inference), 
-                                             expfolder='imbalanced_supports/layernorm/', pretrained_backbone=backbone, 
+                                             expfolder='imbalanced_supports/', pretrained_backbone=backbone, 
                                              slow_learning=g_args.slow_learning, backbone=g_args.backbone, 
                                              dataset=g_args.dataset)
         

@@ -1,5 +1,5 @@
 from utils.utils import set_torch_seed, set_gpu, get_tasks, get_data, get_model, get_backbone, get_strategy
-from utils.utils import compress_and_print_args, get_args, torch_summarize
+from utils.utils import compress_args, get_args, torch_summarize
 from utils.builder import ExperimentBuilder
 from utils.bunch import bunch
 import sys
@@ -19,11 +19,16 @@ if __name__ == '__main__':
     strategy = get_strategy(args, device)
     model    = get_model(backbone, tasks, datasets, strategy, args, device)
     
-    compress_and_print_args(args, parser)
-    
+    compressed_args = compress_args(bunch.unbunchify(args), parser)
+    print(" ----------------- FULL ARGS (COMPACT) ----------------")
+    pprint.pprint(compressed_args, indent=2)
+    print(" ------------------------------------------------------")
     print(" ------------ EXCLUDED (UNRECOGNISED) ARGS ------------")
     pprint.pprint(excluded_args, indent=2)
     print(" ------------------------------------------------------")
     
     system = ExperimentBuilder(model, tasks, datasets, device, args)
-    system.run_experiment()
+    system.load_pretrained()
+    system.train_model()
+    system.evaluate_model()
+        

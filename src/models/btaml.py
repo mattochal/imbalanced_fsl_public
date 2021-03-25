@@ -59,10 +59,11 @@ class BayesianTAML(ModelTemplate):
     def setup_model(self):
         self.loss_fn = nn.CrossEntropyLoss(reduce=False)
         self.classifier = self.setup_classifier(self.output_dim.train)
-        self.inference_network = InferenceNetwork(self.backbone, self.args, self.device).to(self.device)
+        self.inference_network = InferenceNetwork(self.backbone.num_layers, self.backbone.layer_channels, 
+                                                  self.args, self.device).to(self.device)
         self.all_params = list(self.backbone.parameters()) + \
-                     list(self.classifier.parameters()) + \
-                     list(self.inference_network.parameters())
+                          list(self.classifier.parameters()) + \
+                          list(self.inference_network.parameters())
         if self.alpha_on:
             self.alpha = self.get_alpha(self.get_inner_loop_named_params())
             self.all_params += list(self.alpha.values())
@@ -263,13 +264,29 @@ class BayesianTAML(ModelTemplate):
                 new_weight = torch.ones(new_shape, requires_grad=True, device=self.device) * self.inner_loop_lr # initialise
             alpha[name] = nn.Parameter(0.01*new_weight)
         return alpha
-            
+    
+    
+    def load_state_dict(self, state_dict):
+        for k,v in list(state_dict.items()): 
+            if k.startswith('alpha.'):
+                self.alpha[k.replace('alpha.', '')] = v
+                del state_dict[k]
+        return super(BayesianTAML, self).load_state_dict(state_dict)
+    
+    
+    def state_dict(self):
+        state_dict = super(BayesianTAML, self).state_dict()
+        if self.alpha_on:
+            state_dict.update({'alpha.'+k:v for k,v in self.alpha.items()})
+        return state_dict
+    
             
 class InferenceNetwork(nn.Module):
     
-    def __init__(self, backbone, args, device):
+    def __init__(self, backbone_num_layers, backbone_layer_channels, args, device):
         super(InferenceNetwork, self).__init__()
-        self.backbone = backbone
+        self.backbone_num_layers = backbone_num_layers
+        self.backbone_layer_channels = backbone_layer_channels
         self.omega_on = args.omega_on
         self.gamma_on = args.gamma_on
         self.z_on = args.z_on
@@ -320,14 +337,14 @@ class InferenceNetwork(nn.Module):
         self.g_encoder = nn.Sequential(*[
             nn.Linear(128, 64),
             nn.ReLU(),
-            nn.Linear(64, 2 * (self.backbone.num_layers + 1)) # std and mean, for each layer (incl. classifier)
+            nn.Linear(64, 2 * (self.backbone_num_layers + 1)) # std and mean, for each layer (incl. classifier)
         ]).to(device)
         
         # z encoder
         self.z_encoder = nn.Sequential(*[
             nn.Linear(128, 64),
             nn.ReLU(),
-            nn.Linear(64, 2 * 2 * sum(self.backbone.layer_channels) )  # std and mean, for bias and weight, for each channel
+            nn.Linear(64, 2 * 2 * sum(self.backbone_layer_channels) )  # std and mean, for bias and weight, for each channel
         ]).to(device)
         
         self.softplus = nn.Softplus().to(self.device)
@@ -411,12 +428,12 @@ class InferenceNetwork(nn.Module):
             kl = kl + kl_gamma
             g_ = q_gamma.rsample() if with_sampling else q_gamma.mean
             g_ = torch.exp(g_)
-            g_ = torch.split(g_, [1] * (self.backbone.num_layers+1), 0)
+            g_ = torch.split(g_, [1] * (self.backbone_num_layers+1), 0)
             gamma = []
-            for l in range(self.backbone.num_layers):
+            for l in range(self.backbone_num_layers):
                 gamma.append(g_[l])
                 
-            l = self.backbone.num_layers
+            l = self.backbone_num_layers
             gamma.append(g_[l]) # last gamma for classifier
         
         if self.z_on:
@@ -424,11 +441,11 @@ class InferenceNetwork(nn.Module):
             z_ = q_z.rsample() if with_sampling else q_z.mean
             zw_ = z_[0::2].squeeze()     # even indices for weights 
             zb_ = z_[1::2].squeeze()     # odd indices for biases
-            zw_ = torch.split(zw_, self.backbone.layer_channels)
-            zb_ = torch.split(zb_, self.backbone.layer_channels)
+            zw_ = torch.split(zw_, self.backbone_layer_channels)
+            zb_ = torch.split(zb_, self.backbone_layer_channels)
             
             z = {'w':[], 'b':[]}
-            for l in range(self.backbone.num_layers):
+            for l in range(self.backbone_num_layers):
                 z['w'].append(zw_[l])
                 z['b'].append(zb_[l])
                 
