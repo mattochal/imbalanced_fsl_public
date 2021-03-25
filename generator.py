@@ -828,7 +828,7 @@ if __name__ == '__main__':
     if g_args.imbalanced_supports:
         # Standard meta-training
         standard_expfiles = fsl_imbalanced(g_args, models=models, strategies=[None], seeds=seeds, train_tasks=balanced_tasks,
-                                save=not (g_args.test or g_args.inference), expfolder='imbalanced_supports/layernorm/', 
+                                save=not (g_args.test or g_args.inference), expfolder='imbalanced_supports/', 
                                            pretrained_backbone=backbone, slow_learning=g_args.slow_learning, 
                                         backbone=g_args.backbone, dataset=g_args.dataset)
         # Random Shot meta-training
