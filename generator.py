@@ -28,7 +28,7 @@ def flatten_dict(d, prefix=None, seperator='.', value_map=lambda x: x):
     return new_d
 
     
-def substitute_hyperparams(hyperparams, config=None):
+def substitute_hyperparams(hyperparams, config=None, suppress_warning=False):
     hyperparams = from_syntactic_sugar(hyperparams)
 #     pprint(hyperparams)
 #     pdb.set_trace()
@@ -36,6 +36,11 @@ def substitute_hyperparams(hyperparams, config=None):
         combined_args, excluded_args, _ = get_args([], hyperparams)
     else:
         combined_args, excluded_args  = update_dict_exclusive(config, hyperparams)
+    
+    if not suppress_warning and len(excluded_args) > 0:
+        print("""excluded""")
+        pprint(excluded_args)
+        
     return combined_args
 
 
@@ -427,10 +432,10 @@ def imbalanced_task_test(g_args, expfiles):
         
         script, script_path, config, config_path = experiment
         
-        # substitute for backward compatibility so new code versions work on old configs
-#         default_config, _ = update_dict_exclusive(default_config, config) 
+        # expanded args also useful for backward compatibility. 
+        config = substitute_hyperparams(config)
         
-        assert default_config['task'] == 'fsl_imbalanced'
+        assert config['task'] == 'fsl_imbalanced'
         
         for t, test_setting in enumerate(test_settings):
             test_name = test_names[t]
@@ -449,12 +454,12 @@ def imbalanced_task_test(g_args, expfiles):
                 'task_args.test.imbalance_distribution',
                 'task_args.test.min_num_targets', 
                 'task_args.test.max_num_targets',
-                'task_args.test.num_minority_tagets',
+                'task_args.test.num_minority_targets',
                 'task_args.test.imbalance_distribution_targets'
             )] = [test_setting]
             
             generate_experiments(
-                default_config['experiment_name'], 
+                config['experiment_name'], 
                 variables,
                 g_args,
                 default_config = config,
@@ -533,7 +538,7 @@ def strategy_inference(g_args, expfiles):
                 template = 'strategy_inference/{strategy}/'
 
                 if strategy == 'cb_loss':
-                    variables['strategy_args.beta'] = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,0.99]
+                    variables['strategy_args.beta'] = [0.8]
                     template += "{strategy_args.beta}beta/"
                 
                 template += default_config['experiment_name']
@@ -775,8 +780,8 @@ if __name__ == '__main__':
     if g_args.strategies is None or len(g_args.strategies) == 0:
         strategies = [
             None,
-            'ros',
-            'ros_aug',
+            # 'ros',
+            # 'ros_aug',
             # 'freq_ros_aug'
             # 'focal_loss',
             # 'weighted_loss',
@@ -802,7 +807,7 @@ if __name__ == '__main__':
     
     imbalanced_tasks = [
 #         (1, 9, None, 'dunbiased', 15, 15, None, 'balanced'),   # Unbiased-Random Meta-Training
-        (1, 9, None, 'random', 15, 15, None, 'balanced'),   # Random-Shot Meta-Training
+        #(1, 9, None, 'random', 15, 15, None, 'balanced'),   # Random-Shot Meta-Training
         
 #         (1, 29, None, 'random', 15, 15, None, 'balanced'),  # -- uncomment if appropiate
 #         (1, 49, None, 'random', 15, 15, None, 'balanced'),  # -- uncomment if appropiate
@@ -898,3 +903,4 @@ if __name__ == '__main__':
         print('Please specify --imbalanced_dataset or --imbalanced_supports')
             
         
+
