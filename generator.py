@@ -780,8 +780,8 @@ if __name__ == '__main__':
     if g_args.strategies is None or len(g_args.strategies) == 0:
         strategies = [
             None,
-            # 'ros',
-            # 'ros_aug',
+             'ros',
+             'ros_aug',
             # 'freq_ros_aug'
             # 'focal_loss',
             # 'weighted_loss',
@@ -807,7 +807,7 @@ if __name__ == '__main__':
     
     imbalanced_tasks = [
 #         (1, 9, None, 'dunbiased', 15, 15, None, 'balanced'),   # Unbiased-Random Meta-Training
-        #(1, 9, None, 'random', 15, 15, None, 'balanced'),   # Random-Shot Meta-Training
+        (1, 9, None, 'random', 15, 15, None, 'balanced'),   # Random-Shot Meta-Training
         
 #         (1, 29, None, 'random', 15, 15, None, 'balanced'),  # -- uncomment if appropiate
 #         (1, 49, None, 'random', 15, 15, None, 'balanced'),  # -- uncomment if appropiate
