@@ -112,7 +112,7 @@ def to_syntactic_sugar(args, fromlvl=None):
     return sugar_dict
 
 
-def expand_three_phase_and_update(default_args, args, suppress_warning=False):
+def expand_three_phase_and_update(default_args, args, suppress_warning=True):
     """
     Updated default_args with hyperparameters in args
     param default_args: should a dict(test=dict(), train=dict(), val=dict()) to update, containing full default arguments
@@ -186,7 +186,7 @@ def expand_three_phase_and_update(default_args, args, suppress_warning=False):
 
     
 
-def expand_three_phase(args, suppress_warning=False):
+def expand_three_phase(args, suppress_warning=True):
     """
     Updated default_args with hyperparameters in args
     param default_args: should a dict(test=dict(), train=dict(), val=dict()) to update, containing full default arguments

@@ -28,10 +28,9 @@ def flatten_dict(d, prefix=None, seperator='.', value_map=lambda x: x):
     return new_d
 
     
-def substitute_hyperparams(hyperparams, config=None, suppress_warning=False):
+def substitute_hyperparams(hyperparams, config=None, suppress_warning=True):
     hyperparams = from_syntactic_sugar(hyperparams)
-#     pprint(hyperparams)
-#     pdb.set_trace()
+    
     if config is None:
         combined_args, excluded_args, _ = get_args([], hyperparams)
     else:
@@ -759,33 +758,33 @@ if __name__ == '__main__':
     if g_args.models is None or len(g_args.models) == 0:
         models = [
             'protonet',
-#             'maml',
-#             'dkt',
-#             'baseline',
-#             'protomaml',
-#             'relationnet',
-#             'baselinepp',
-#             'matchingnet',
-#             'simpleshot',
-#             'knn',
+            'maml',
+            'dkt',
+            'baseline',
+            'protomaml',
+            'relationnet',
+            'baselinepp',
+            'matchingnet',
+            'simpleshot',
+            'knn',
+            'btaml', 
             # 'bmaml',
             # 'bmaml_chaser',
             # 'protodkt',
             # 'relationdkt'
-#             'btaml', 
         ]
     else:
         models = g_args.models
         
     if g_args.strategies is None or len(g_args.strategies) == 0:
         strategies = [
-            None,
-             'ros',
-             'ros_aug',
+#             None,
+#              'ros',
+#              'ros_aug',
             # 'freq_ros_aug'
-            # 'focal_loss',
-            # 'weighted_loss',
-            # 'cb_loss'
+            'focal_loss',
+            'weighted_loss',
+            'cb_loss'
         ]
     else:
         strategies = [ None if s in ['None','none'] else s for s in g_args.strategies]
@@ -800,7 +799,7 @@ if __name__ == '__main__':
         seeds = g_args.seeds
         
     balanced_tasks = [
-        (5, 5, None, 'balanced', 15, 15, None, 'balanced'),  # Standard Meta-Training
+#         (5, 5, None, 'balanced', 15, 15, None, 'balanced'),  # Standard Meta-Training
 #         (15, 15, None, 'balanced', 15, 15, None, 'balanced'),  # -- uncomment if appropiate
 #         (25, 25, None, 'balanced', 15, 15, None, 'balanced'),  # -- uncomment if appropiate
     ]
