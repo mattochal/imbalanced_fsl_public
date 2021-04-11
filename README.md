@@ -1,4 +1,16 @@
 # Imbalanced Few-Shot Learning Framework in Pytorch
+This repository contains code for:
+ * "Few-Shot Learning with Class Imbalance" [(arXiv)](http://arxiv.org/abs/2101.02523).
+ * "How sensitive are Meta-Learners to Dataset Imbalance?" [(ICLR ``Learning to Learn`` Workshop 2021)](https://openreview.net/forum?id=-vafHc91wO8&referrer=%5BAuthor%20Console%5D(%2Fgroup%3Fid%3DICLR.cc%2F2021%2FWorkshop%2FLearning_to_Learn%2FAuthors%23your-submissions)) [(arXiv[TODO])](http://arxiv.org/).
+
+
+This respository is also compatible with my demo app for few-shot learning [(available here)](http://github.com/mattochal/demo_fsl_public).
+
+![GUI Screenshot](https://github.com/mattochal/demo_fsl_dev/blob/master/demo.gif?raw=true)
+
+
+## UPDATES
+\[11 April 2021\] - Major update including corrections to BTAML, ProtoMAML, experiments on long-tail distribution, task-by-task demo app compatibility. 
 
 
 ### Dependecies
@@ -50,8 +62,6 @@ See ```./data/README.md```
 
 
 ## Generating Main Experiments
-
-This repository contains code for "Class-Imbalance in Few-Shot Learning".
 
 To generate the experiment scripts and files for the main experiments in the paper:
 ```
