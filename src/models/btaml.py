@@ -15,7 +15,7 @@ class BayesianTAML(ModelTemplate):
     @staticmethod
     def get_parser(parser=None):
         """
-        returns a parser for the given model. Can also return a subparser
+        returns a parser for the given model
         """
         if parser is None: parser = argparse.ArgumentParser()
         parser = ModelTemplate.get_parser(parser)
