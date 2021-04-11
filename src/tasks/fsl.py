@@ -8,7 +8,9 @@ import sys
 class FSLTask(TaskTemplate):
     
     @staticmethod
-    def get_parser(parser=argparse.ArgumentParser()):
+    def get_parser(parser=None):
+        if parser is None:
+            parser = argparse.ArgumentParser("FSL Task Parser")
         parser.add_argument('--num_classes', type=int, default=5, 
                             help="Number of classes per episode (n-way).")
         parser.add_argument('--num_supports', type=int, default=5,

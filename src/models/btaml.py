@@ -4,7 +4,7 @@ from torch.autograd import Variable
 import numpy as np
 import torch.nn.functional as F
 from models.model_template import ModelTemplate
-import models.backbones as backbones
+from backbones.layers import Linear_fw
 import utils.utils as utils
 import copy
 import argparse
@@ -15,12 +15,12 @@ class BayesianTAML(ModelTemplate):
     @staticmethod
     def get_parser(parser=None):
         """
-        returns a parser for the given model. Can also return a subparser
+        returns a parser for the given model
         """
         if parser is None: parser = argparse.ArgumentParser()
         parser = ModelTemplate.get_parser(parser)
-        parser.add_argument('--num_inner_loop_steps', type=int, default=10)
-        parser.add_argument('--inner_loop_lr', type=float, default=0.1)
+        parser.add_argument('--num_inner_loop_steps', type=dict, default={"train":5, "val":10, "test":10})
+        parser.add_argument('--inner_loop_lr', type=float, default=0.01)
         parser.add_argument('--approx', type=utils.str2bool, default=False)
         parser.add_argument('--approx_until', type=int, default=0,
                            help='approx until the specified epoch to expediate training')
@@ -34,8 +34,7 @@ class BayesianTAML(ModelTemplate):
         parser.add_argument('--z_on', type=utils.str2bool, default=True)
         parser.add_argument('--with_sampling', type=utils.str2bool, default=True)
         parser.add_argument('--num_draws', type=dict, default={"train":1, "val":1, "test":10})
-        parser.add_argument('--max_shot', type=dict, default=-1,
-                           help='Max shot (if -1, set in code)')
+        parser.add_argument('--max_shot', type=dict, default=-1, help='Max shot (if -1, set in code)')
         return parser
     
     def __init__(self, backbone, strategy, args, device):
@@ -44,6 +43,7 @@ class BayesianTAML(ModelTemplate):
         self.approx_until = args.approx_until
         self.inner_loop_lr = args.inner_loop_lr
         self.num_steps = args.num_inner_loop_steps
+        self.with_sampling = args.with_sampling
         self.output_dim = args.output_dim
         self.batch_size = args.batch_size
         self.num_draws = args.num_draws
@@ -59,10 +59,11 @@ class BayesianTAML(ModelTemplate):
     def setup_model(self):
         self.loss_fn = nn.CrossEntropyLoss(reduce=False)
         self.classifier = self.setup_classifier(self.output_dim.train)
-        self.inference_network = InferenceNetwork(self.backbone, self.args, self.device).to(self.device)
+        self.inference_network = InferenceNetwork(self.backbone.num_layers, self.backbone.layer_channels, 
+                                                  self.args, self.device).to(self.device)
         self.all_params = list(self.backbone.parameters()) + \
-                     list(self.classifier.parameters()) + \
-                     list(self.inference_network.parameters())
+                          list(self.classifier.parameters()) + \
+                          list(self.inference_network.parameters())
         if self.alpha_on:
             self.alpha = self.get_alpha(self.get_inner_loop_named_params())
             self.all_params += list(self.alpha.values())
@@ -74,7 +75,7 @@ class BayesianTAML(ModelTemplate):
         self.optimizer.step()
         
     def setup_classifier(self, output_dim):
-        classifier = backbones.Linear_fw(self.backbone.final_feat_dim, output_dim).to(self.device)
+        classifier = Linear_fw(self.backbone.final_feat_dim, output_dim).to(self.device)
         classifier.bias.data.fill_(0)
         return classifier
         
@@ -102,7 +103,7 @@ class BayesianTAML(ModelTemplate):
                 self.net_reset()
                 kl_loss = self.net_train(support_set)
                 loss, scores = self.net_eval(target_set, ptracker)
-                sample_scores += scores
+                sample_scores += torch.softmax(scores, -1)
                 losses += loss
                 kl_losses += kl_loss * kl_scaling
             
@@ -110,7 +111,7 @@ class BayesianTAML(ModelTemplate):
             kl_losses /= num_draws
             sample_scores /= num_draws
             
-            total_losses.append(losses+kl_losses)
+            total_losses.append(losses+0.1*kl_losses)
             
             _, pred_y = torch.max(sample_scores, axis=1)
             
@@ -126,7 +127,7 @@ class BayesianTAML(ModelTemplate):
             self.optimizer.zero_grad()
             loss = torch.stack(self.batch_losses).sum(0)
             loss.backward()
-#             torch.nn.utils.clip_grad_norm_(self.all_params, 3)  # doesn't do much
+            torch.nn.utils.clip_grad_value_(self.all_params, 3)
             self.optimizer.step()
             self.batch_losses = []
         
@@ -146,7 +147,7 @@ class BayesianTAML(ModelTemplate):
                 self.net_reset()
                 self.net_train(support_set)
                 loss,scores = self.net_eval(target_set, ptracker)
-                sample_scores += scores.detach().cpu()
+                sample_scores += torch.softmax(scores, -1).detach().cpu()
                 losses += loss.detach().cpu()
                 del loss
                 del scores
@@ -154,6 +155,7 @@ class BayesianTAML(ModelTemplate):
             losses /= num_draws
             sample_scores /= num_draws
             _, pred_y = torch.max(sample_scores, axis=1)
+            
             ptracker.add_task_performance(
                 pred_y.numpy(),
                 targets_y.detach().cpu().numpy(),
@@ -169,7 +171,8 @@ class BayesianTAML(ModelTemplate):
         (support_x, support_y) = support_set
         uniq_y = support_y.unique()
         
-        omega, gamma, z, kl = self.inference_network((support_x, support_y))
+        with_sampling = (self.with_sampling and self.mode != 'val')
+        omega, gamma, z, kl = self.inference_network((support_x, support_y), with_sampling=with_sampling)
         
         if self.z_on:
             for i, named_weight in enumerate(self.backbone.named_parameters()):
@@ -180,7 +183,7 @@ class BayesianTAML(ModelTemplate):
                 elif "C.bias" in name:
                     weight = weight + z['b'][layer_id]
         
-        for n_step in range(self.num_steps):
+        for n_step in range(self.num_steps[self.mode]):
             support_h  = self.backbone.forward(support_x)
             scores  = self.classifier.forward(support_h)
             losses = self.loss_fn(scores, support_y)
@@ -259,22 +262,37 @@ class BayesianTAML(ModelTemplate):
             else: # classifier
                 new_shape = (1, *weight.shape[1:])
                 new_weight = torch.ones(new_shape, requires_grad=True, device=self.device) * self.inner_loop_lr # initialise
-            alpha[name] = nn.Parameter(new_weight)
+            alpha[name] = nn.Parameter(0.01*new_weight)
         return alpha
-            
+    
+    
+    def load_state_dict(self, state_dict):
+        for k,v in list(state_dict.items()): 
+            if k.startswith('alpha.'):
+                self.alpha[k.replace('alpha.', '')] = v
+                del state_dict[k]
+        return super(BayesianTAML, self).load_state_dict(state_dict)
+    
+    
+    def state_dict(self):
+        state_dict = super(BayesianTAML, self).state_dict()
+        if self.alpha_on:
+            state_dict.update({'alpha.'+k:v for k,v in self.alpha.items()})
+        return state_dict
+    
             
 class InferenceNetwork(nn.Module):
     
-    def __init__(self, backbone, args, device):
+    def __init__(self, backbone_num_layers, backbone_layer_channels, args, device):
         super(InferenceNetwork, self).__init__()
-        self.backbone = backbone
+        self.backbone_num_layers = backbone_num_layers
+        self.backbone_layer_channels = backbone_layer_channels
         self.omega_on = args.omega_on
         self.gamma_on = args.gamma_on
         self.z_on = args.z_on
         self.device = device
         self.num_channel = 3
         self.max_shot = args.max_shot
-        self.with_sampling = args.with_sampling
         self.output_dim = args.output_dim
         
         # sample encoder (1)
@@ -291,7 +309,7 @@ class InferenceNetwork(nn.Module):
         
         # interact1
         self.interact1 = nn.Sequential(*[
-            nn.Linear(64*3, 64*4),
+            nn.Linear(3, 4),
             nn.ReLU()
         ]).to(device)
         
@@ -304,42 +322,39 @@ class InferenceNetwork(nn.Module):
         
         # interact2
         self.interact2 = nn.Sequential(*[
-            nn.Linear(32*3, 32*4),  # 32*3 = 96, 32*4 = 128
+            nn.Linear(3, 4),
             nn.ReLU()
         ]).to(device)
         
         # omega encoder
         self.o_encoder = nn.Sequential(*[
-            nn.Linear(64*4, 64),
+            nn.Linear(256, 64),
             nn.ReLU(),
             nn.Linear(64, 2) # std and mean
         ]).to(device)
         
         # gamma encoder
         self.g_encoder = nn.Sequential(*[
-            nn.Linear(32*4, 64),
+            nn.Linear(128, 64),
             nn.ReLU(),
-            nn.Linear(64, 2 * (self.backbone.num_layers + 1)) # std and mean, for each layer (incl. classifier)
+            nn.Linear(64, 2 * (self.backbone_num_layers + 1)) # std and mean, for each layer (incl. classifier)
         ]).to(device)
         
         # z encoder
         self.z_encoder = nn.Sequential(*[
-            nn.Linear(32*4, 64),
+            nn.Linear(128, 64),
             nn.ReLU(),
-            nn.Linear(64, 2 * 2 * sum(self.backbone.layer_channels) )  # std and mean, for bias and weight, for each channel
+            nn.Linear(64, 2 * 2 * sum(self.backbone_layer_channels) )  # std and mean, for bias and weight, for each channel
         ]).to(device)
         
         self.softplus = nn.Softplus().to(self.device)
         self.softmax = nn.Softmax(dim=0).to(self.device)
-        
-        initialize(self)
-        
 
     def _stat_pool(self, x, N):
         # Compute element-wise sample mean, var., and set cardinality
-        mean, var = x.mean(dim=0), x.var(dim=0)
+        mean, var = x.mean(dim=0), x.var(dim=0, unbiased=False)
         N = N.reshape([-1]).repeat(mean.shape).to(self.device)
-        return torch.stack([mean, var, N], 1).view(-1)
+        return torch.stack([mean, var, N], 1)
     
     def get_posterior(self, inputs):
         (x, y) = inputs
@@ -360,11 +375,13 @@ class InferenceNetwork(nn.Module):
         
         class_stats = torch.stack(class_stats)
         class_stats = self.interact1(class_stats)
+        class_stats = class_stats.view(class_stats.shape[0], -1)
         
         # statistics pooling 2
         encoded_stats = self.stats_encoder(class_stats)
         encoded_stats = self._stat_pool(encoded_stats, N=torch.mean(torch.tensor(class_num)))
         encoded_stats = self.interact2(encoded_stats)
+        encoded_stats = encoded_stats.view(1, -1)
         
         # generate omega (from statistics pooling 1) for each class
         o_stats = self.o_encoder(class_stats)
@@ -374,20 +391,20 @@ class InferenceNetwork(nn.Module):
         
         # generate gamma (from statistics pooling 2) for each backbone layer
         g_stats = self.g_encoder(encoded_stats)
-        mu_gamma = g_stats[0::2].squeeze()     # even indices for mean
-        sigma_gamma = g_stats[1::2].squeeze()  # odd indices for sigma
+        mu_gamma = g_stats[:,0::2].squeeze()     # even indices for mean
+        sigma_gamma = g_stats[:,1::2].squeeze()  # odd indices for sigma
         q_gamma = torch.distributions.Normal(mu_gamma, self.softplus(sigma_gamma))
         
         # generate z (from statistics pooling 2) for each backbone layer channel output 
         z_stats = self.z_encoder(encoded_stats)
-        mu_z = z_stats[0::2].squeeze()     # even indices for mean 
-        sigma_z = z_stats[1::2].squeeze()  # odd indices for sigma 
+        mu_z = z_stats[:,0::2].squeeze()     # even indices for mean 
+        sigma_z = z_stats[:,1::2].squeeze()  # odd indices for sigma 
         q_z = torch.distributions.Normal(mu_z, self.softplus(sigma_z))
         
         return q_omega, q_gamma, q_z
     
     
-    def forward(self, inputs):
+    def forward(self, inputs, with_sampling=False):
         
         # compute posterior
         q_omega, q_gamma, q_z = self.get_posterior(inputs)
@@ -404,31 +421,31 @@ class InferenceNetwork(nn.Module):
         
         if self.omega_on:
             kl = kl + kl_omega
-            omega = q_omega.sample() if self.with_sampling else q_omega.mean
+            omega = q_omega.rsample() if with_sampling else q_omega.mean
             omega = self.softmax(omega)
         
         if self.gamma_on:
             kl = kl + kl_gamma
-            g_ = q_gamma.sample() if self.with_sampling else q_gamma.mean
+            g_ = q_gamma.rsample() if with_sampling else q_gamma.mean
             g_ = torch.exp(g_)
-            g_ = torch.split(g_, [1] * (self.backbone.num_layers+1), 0)
+            g_ = torch.split(g_, [1] * (self.backbone_num_layers+1), 0)
             gamma = []
-            for l in range(self.backbone.num_layers):
+            for l in range(self.backbone_num_layers):
                 gamma.append(g_[l])
                 
-            l = self.backbone.num_layers
+            l = self.backbone_num_layers
             gamma.append(g_[l]) # last gamma for classifier
         
         if self.z_on:
             kl = kl + kl_z
-            z_ = q_z.sample() if self.with_sampling else q_z.mean
+            z_ = q_z.rsample() if with_sampling else q_z.mean
             zw_ = z_[0::2].squeeze()     # even indices for weights 
             zb_ = z_[1::2].squeeze()     # odd indices for biases
-            zw_ = torch.split(zw_, self.backbone.layer_channels)
-            zb_ = torch.split(zb_, self.backbone.layer_channels)
+            zw_ = torch.split(zw_, self.backbone_layer_channels)
+            zb_ = torch.split(zb_, self.backbone_layer_channels)
             
             z = {'w':[], 'b':[]}
-            for l in range(self.backbone.num_layers):
+            for l in range(self.backbone_num_layers):
                 z['w'].append(zw_[l])
                 z['b'].append(zb_[l])
                 
@@ -440,20 +457,3 @@ def kl_diagnormal_stdnormal(p):
     device = p.mean.device
     q = torch.distributions.Normal(torch.zeros(pshape, device=device), torch.ones(pshape, device=device))
     return torch.distributions.kl.kl_divergence(p, q).to(device)
-
-
-def initialize(model, mean=0, std=0.02):
-    # trunckated 
-    for named_param in model.named_parameters():
-        name, tensor = named_param
-#         print(name)
-        if 'weight' in name:
-            size = tensor.shape
-            tmp = tensor.new_empty(size + (4,)).normal_()
-            valid = (tmp < 2) & (tmp > -2)
-            ind = valid.max(-1, keepdim=True)[1]
-            tensor.data.copy_(tmp.gather(-1, ind).squeeze(-1))
-            tensor.data.mul_(std).add_(mean)
-        else:
-            tensor.data.mul_(0.)
-    

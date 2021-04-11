@@ -1,7 +1,8 @@
 import sys
 sys.path.insert(0,'./src/')
 
-from utils.utils import MODELS, TASKS, DATASETS, get_main_parser, Bunch, toBunch, get_default_parser_args, get_task_classes, convert_to_nested_dict, update_dict, get_full_task_args, get_full_model_args, get_full_dataset_args, compress, get_full_ptracker_args, get_full_strategy_args, str2bool
+from utils.utils import *
+from utils.parser_utils import *
 
 import itertools
 import os
@@ -15,51 +16,6 @@ from collections import defaultdict
 import string
 
 
-
-class FormatDict(dict):
-    # https://ideone.com/DZJO1I
-    # https://stackoverflow.com/a/11284026
-    def __missing__(self, key):
-        return FormatPlaceholder(key)
-    
-class FormatPlaceholder:
-    # https://ideone.com/DZJO1I
-    # https://stackoverflow.com/a/11284026
-    def __init__(self, key):
-        self.key = key
-    def __format__(self, spec):
-        result = self.key
-        if spec:
-            result += ':' + spec
-        return '{' + result + '}'
-    def __getitem__(self, index):
-        self.key = '{}[{}]'.format(self.key, index)
-        return self
-    def __getattr__(self, attr):
-        self.key = '{}.{}'.format(self.key, attr)
-        return self
-    
-class StringTemplate(object):
-    
-    def __init__(self, template):
-        self.template = template
-
-    def format(self, dict):
-        formatter = string.Formatter()
-        mapping = FormatDict(dict)
-        return formatter.vformat(self.template, (), mapping)
-    
-    
-def get_default_config():
-    main_args = get_default_parser_args(get_main_parser())
-    main_args['model_args'] = None
-    main_args['task_args'] = None
-    main_args['dataset_args'] = None
-    main_args['ptracker_args'] = None
-    main_args['strategy_args'] = None
-    return convert_to_nested_dict(main_args)
-
-
 def flatten_dict(d, prefix=None, seperator='.', value_map=lambda x: x):
     new_d = {}
     for key, value in list(d.items()):
@@ -70,54 +26,27 @@ def flatten_dict(d, prefix=None, seperator='.', value_map=lambda x: x):
         else:
             new_d[new_key] = value
     return new_d
-            
+
     
-def substitute_hyperparameters(config, hyperparameters):
-#     import pdb; pdb.set_trace()
-    hyperparameters = convert_to_nested_dict(hyperparameters)
-    dataset_args = hyperparameters['dataset_args'] if 'dataset_args' in hyperparameters else dict() 
-    task_args = hyperparameters['task_args'] if 'task_args' in hyperparameters else dict() 
-    model_args = hyperparameters['model_args'] if 'model_args' in hyperparameters else dict() 
-    ptracker_args = hyperparameters['ptracker_args'] if 'ptracker_args' in hyperparameters else dict() 
-    strategy_args = hyperparameters['strategy_args'] if 'strategy_args' in hyperparameters else dict() 
+def substitute_hyperparams(hyperparams, config=None, suppress_warning=True):
+    hyperparams = from_syntactic_sugar(copy.deepcopy(hyperparams))
     
-    task_name = hyperparameters['task'] if 'task' in hyperparameters else config['task']
-    model_name = hyperparameters['model'] if 'model' in hyperparameters else config['model']
-    dataset_name = hyperparameters['dataset'] if 'dataset' in hyperparameters else config['dataset']
-    strategy_name = hyperparameters['strategy'] if 'strategy' in hyperparameters else config['strategy']
-    
-    tasks = get_task_classes(task_name, model_name)
-    
-    full_task_args = get_full_task_args(tasks, task_args, 
-        default_args=config['task_args'])
-    
-    full_model_args = get_full_model_args(model_name, model_args, 
-        default_args=config['model_args'])
-    
-    full_dataset_args = get_full_dataset_args(dataset_name, dataset_args, 
-        default_args=config['dataset_args'])
-    
-    full_ptracker_args = get_full_ptracker_args(ptracker_args, 
-        default_args=config['ptracker_args'])
-    
-    full_strategy_args = get_full_strategy_args(strategy_name, strategy_args, 
-        default_args=config['strategy_args'])
-    
-    hyperparameters['model_args'] = full_model_args
-    hyperparameters['task_args'] = full_task_args
-    hyperparameters['dataset_args'] = full_dataset_args
-    hyperparameters['ptracker_args'] = full_ptracker_args
-    hyperparameters['strategy_args'] = full_strategy_args
-    
-    config = update_dict(config, hyperparameters)
-    return config
+    if config is None:
+        combined_args, excluded_args, _ = get_args([], hyperparams)
+    else:
+        # Convert from three phase syntactic sugar format
+        for three_phase_args in ['dataset_args', 'ptracker_args', 'task_args']:
+            if three_phase_args in hyperparams:
+                hyperparams[three_phase_args] = expand_three_phase(hyperparams[three_phase_args])
         
-def compress_config(config):
-    config['task_args'] = compress(config['task_args'])
-    config['dataset_args'] = compress(config['dataset_args'])
-    config['ptracker_args'] = compress(config['ptracker_args'])
-    config['strategy_args'] = compress(config['strategy_args'])
-    return config
+        combined_args, excluded_args  = update_dict_exclusive(config, hyperparams)
+    
+    if not suppress_warning and len(excluded_args) > 0:
+        print("""excluded""")
+        pprint(excluded_args)
+        
+    return combined_args
+
 
 def unpack(comb):
     new_comb = {}
@@ -162,11 +91,24 @@ def get_bash_script(exp_kwargs={}):
     script += get_python_script(exp_kwargs) + ' $2'
     return script
     
-
-def generate_experiments(experiment_name_template, variables, default_config, args,
-                        config_name='config', script_name='script', log_name='log', save=True):
-                
-    if args.dummy_run:
+    
+def value_map(x):
+    return int(x) if type(x) == bool else x
+    
+def generate_experiments(name_template, 
+                         variables,
+                         g_args,
+                         default_config=None,
+                         config_name='config', 
+                         script_name='script', 
+                         log_name='log', 
+                         save=True):
+    
+    global GPU_COUNTER  # used to evenly distribute jobs among the gpus (optional)
+    ngpus = len(g_args.gpu)
+    
+    # If dry run
+    if g_args.dummy_run:
         variables.update({
                     'num_epochs': [3],
                     'num_tasks_per_epoch': [3],
@@ -174,75 +116,76 @@ def generate_experiments(experiment_name_template, variables, default_config, ar
                     'num_tasks_per_testing': [3]
         })
         if ('model' in variables and variables['model'] == 'simpleshot') or \
-           ('model' in default_config and default_config['model'] == 'simpleshot'):
+           (default_config is not None and 'model' in default_config and default_config['model'] == 'simpleshot'):
             variables['model_args.approx_train_mean'] = [True]
-    combinations = hyperparameter_combinations(variables)
     
     scripts = []
     configs = []
     script_paths = []
     config_paths = []
     
-    def value_map(x):
-        return int(x) if type(x) == bool else x
+    # Iterate over variable combinations
+    combinations = hyperparameter_combinations(variables)
     
-    if '{' in experiment_name_template and '}' in experiment_name_template:
-        experiment_name_template = experiment_name_template.replace('.', '_') # dots not allowed in {} of str.format(...)
-    
-    for i_comb, hyperparameters in enumerate(combinations):
-        gpu = args.gpu
+    for i_comb, hyperparams in enumerate(combinations):
         
-        full_config = substitute_hyperparameters(default_config, hyperparameters)
+        # Generate full config
+        full_config = substitute_hyperparams(hyperparams, default_config)
         
-        compressed_config = compress_config(copy.deepcopy(full_config))
-        config = copy.deepcopy(compressed_config)
+        # Generate a compressed version of config
+        compressed_config = compress_args(full_config)
         
+        # Flattened config for template name
+        sperator = '_'
+        flat_config = {
+            **flatten_dict(full_config, seperator=sperator, value_map=value_map),
+            **flatten_dict(compressed_config, seperator=sperator, value_map=value_map)
+        }
         
-        if '{' in experiment_name_template and '}' in experiment_name_template:
-            combined_config_flattened = {
-                **flatten_dict(full_config, seperator='_', value_map=value_map),
-                **flatten_dict(compressed_config, seperator='_', value_map=value_map)
-            }
-            experiment_name = experiment_name_template.format(**combined_config_flattened)
-        else:
-            experiment_name = experiment_name_template
+        # Assign experiment_name
+        experiment_name = name_template.replace('.', '_').format(**flat_config)
+        full_config['experiment_name'] = compressed_config['experiment_name'] = experiment_name
         
-        config['experiment_name'] = experiment_name
-        config['task_args'] = flatten_dict(config['task_args'])
-        config['dataset_args'] = flatten_dict(config['dataset_args'])
-        config['ptracker_args'] = flatten_dict(config['ptracker_args'])
-        config['strategy_args'] = flatten_dict(config['strategy_args'])
+        # Setup paths
+        experiment_path = os.path.join(g_args.results_folder, experiment_name)
+        config_path = os.path.join(experiment_path, 'configs', '{}.json'.format(config_name))
+        script_path = os.path.join(experiment_path, 'scripts', '{}.sh'.format(script_name))
+        output_path = os.path.join(experiment_path, 'logs', '{}.txt'.format(log_name))
         
-        config_path = os.path.join(args.dest, experiment_name, 'configs', '{}.json'.format(config_name))
-        script_path = os.path.join(args.dest, experiment_name, 'scripts', '{}.sh'.format(script_name))
-        output_path = os.path.join(args.dest, experiment_name, 'logs', '{}.txt'.format(log_name))
+        # Select gpu
+        gpu = g_args.gpu[GPU_COUNTER % ngpus]
+        GPU_COUNTER+=1
         
-        if args.bash:
-            script_content = get_bash_script(exp_kwargs={'args_file': config_path, 'gpu':gpu})
-            script = 'bash {} {} '.format(script_path, gpu)
+        # Run from .sh script file or directly using python
+        if g_args.bash:
+            config_path = os.path.abspath(config_path)
+            script_path = os.path.abspath(script_path)
+            output_path = os.path.abspath(output_path)
+            script_content = get_bash_script(exp_kwargs={'args_file': config_path, 'gpu':gpu}) + '\n'
+            script_command = 'bash {} {} '.format(script_path, gpu)
         else:
             script_content = get_python_script(exp_kwargs={'args_file': config_path, 'gpu':gpu})
-            script = script_content
+            script_command = script_content
         
-        if not args.no_log:
-            script += ' &> ' + output_path
-        
+        # Save script content
         if save:
-            print(script)
+            if not g_args.no_log: script_command += ' &> ' + output_path
+            print(script_command)
             
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
             os.makedirs(os.path.dirname(config_path), exist_ok=True)
             os.makedirs(os.path.dirname(script_path), exist_ok=True)
             
             with open(config_path,'w') as f:
-                json.dump(config, f, indent=2)
-
+                json.dump(compressed_config, f, indent=2)
+            
             with open(script_path,'w') as f:
                 f.write(script_content)
-            
-        scripts.append(script)
+        
+        # Save scripts for reference
+        scripts.append(script_command)
         script_paths.append(script_path)
-        configs.append(config)
+        configs.append(compressed_config)
         config_paths.append(config_path)
     
     return zip(scripts, script_paths, configs, config_paths)        
@@ -263,9 +206,10 @@ def make_names(settings, way, shot_half=True, query_half=True):
 
     
 
-def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], test_tasks=[], var_update={}, save=True, 
-                   expfolder='', pretrained_backbone=None, slow_learning=False, dataset = 'mini', backbone='Conv4'):
-
+def fsl_imbalanced(g_args, models=[], strategies=[], seeds=[], train_tasks=[], test_tasks=[], var_update={}, save=True, 
+                   expfolder='', pretrained_backbone=None, slow_learning=False, dataset = 'mini', backbone='Conv4',
+                   template_prefix='{dataset}/'):
+    
     n_way = 5
     
     if slow_learning:
@@ -282,7 +226,7 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
              'model_args.lr'              : [0.001], 
              'model_args.lr_decay'        : [0.1],
              'model_args.lr_decay_step'   : [100],
-             'num_tasks_per_epoch'        : [250],
+             'num_tasks_per_epoch'        : [500],
             }
         
     if pretrained_backbone is not None:
@@ -293,6 +237,7 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
          'model_args.lr_decay_step'   : [25],
         }
     
+    is_baseline = lambda x: x in ['baseline', 'baselinepp', 'knn']
     
     experiement_files = []
     for seed in seeds:
@@ -303,7 +248,7 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
                 for strategy in strategies:
                 
                     variables = {
-                        'results_folder'             : [args.dest],
+                        'results_folder'             : [os.path.abspath(g_args.results_folder)],
                         'seed'                       : [seed],
                         'backbone'                   : [backbone],
                         'num_tasks_per_validation'   : [200],
@@ -314,9 +259,10 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
                         'task_args.batch_size'       : [1],
                         'task_args.num_classes'      : [n_way],
                         'dataset'                    : [dataset],
-                        'dataset_args.data_path'     : [args.data_path],
+                        'dataset_args.data_path'     : [g_args.data_path],
                         'dataset_args.train.aug'     : [True],
-                        'ptracker_args.test.metrics' : [['accuracy', 'loss', 'per_cls_stats']]
+                        'ptracker_args.test.metrics' : [['accuracy', 'loss', 'per_cls_stats']],
+                        'tqdm'                       : [False]
                     }
                     variables.update(train_setup)
                     
@@ -328,8 +274,16 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
                                'task_args.max_num_targets',
                                'task_args.num_minority_targets',
                                'task_args.imbalance_distribution_targets')] = [train_task]
+
+                    if is_baseline(model):
+                        variables.update({
+                            'no_val_loop'                       :[False],
+                            'conventional_split'                :[True],
+                            'conventional_split_from_train_only':[False],
+                        })
                     
-                    if len(test_tasks) > 0: 
+                    
+                    if len(test_tasks) > 0:   # else if no test task is given, assume train task is the same as evaluation task 
                         variables[('task_args.eval.min_num_supports', 
                                    'task_args.eval.max_num_supports',
                                    'task_args.eval.num_minority',
@@ -346,14 +300,15 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
                         is_pretrained = 'pretrained_'
                     
                     # experiment path
-                    expath = expfolder + '{dataset}/'+ is_pretrained + '{backbone}/train_on_' + train_name
-                    expath += '/{strategy}/'
-                    
+                    template = expfolder + template_prefix + is_pretrained + '{backbone}/train_on_' + train_name
+                    template += '/{strategy}/' 
+                    #           + '{num_epochs}epochs_{num_tasks_per_epoch}tasks/'
+
                     if slow_learning:
-                        expath += '{num_tasks_per_epoch}x{num_epochs}ep_{model_args.lr}lr_' +\
+                        template += '{num_tasks_per_epoch}x{num_epochs}ep_{model_args.lr}lr_' +\
                                     '{model_args.lr_decay_step}step/'
                     
-                    expath += '{model}/'
+                    template += '{model}/'
                     
                     if model in ['protonet']:
                         variables[(
@@ -361,9 +316,9 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
                             'task_args.train.min_num_targets',
                             'task_args.train.max_num_targets')] = [
                                                                 (20, 5, 5), 
-                                                                (5, 16, 16)
+                                                                (5, 15, 15)
                                                               ]
-                        expath += '{task_args.train.num_classes}trainway/'
+                        template += '{task_args.train.num_classes}trainway/'
 
                     elif model in ['baseline', 'baselinepp', 'knn']:
                         variables['task_args.trval.batch_size'] = [128]  # train and validation batch
@@ -372,7 +327,8 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
                         variables['model_args.batch_size'] = [4] if model == 'maml' else [1]
                         variables['model_args.inner_loop_lr'] = [0.1] if model == 'maml' else [0.005]
                         variables['model_args.num_inner_loop_steps'] = [10] if model == 'maml' else [5]
-                        # expath += '{model_args.num_inner_loop_steps}innersteps_' +\
+
+                        #template += '{model_args.num_inner_loop_steps}innersteps_' +\
                         #          '{model_args.inner_loop_lr}innerlr/'
 
                     elif model in ['bmaml', 'bmaml_chaser']:
@@ -380,43 +336,47 @@ def fsl_imbalanced(args, models=[], strategies=[], seeds=[], train_tasks=[], tes
                         variables['model_args.inner_loop_lr'] = [0.1]
                         variables['model_args.num_inner_loop_steps'] = [1]
                         variables['model_args.num_draws'] = [20]
-
+                        
                         if model == 'bmaml_chaser':
                             variables['model_args.leader_inner_loop_lr'] = [0.5]
+
                         
                     elif model == 'btaml':
-                        variables['backbone_channel_dim'] = [32]
-                        variables['model_args.lr'] = [0.0001]
-                        variables[('model_args.approx','model_args.approx_until')] = [(True,0)]
+                        variables['model_args.approx'] = [False]
                         variables['model_args.batch_size'] = [4]
-                        variables['model_args.inner_loop_lr'] = [0.1]
-                        variables['model_args.num_inner_loop_steps'] = [10]
+                        variables['model_args.inner_loop_lr'] = [0.01]
+                        variables['model_args.num_inner_loop_steps'] = [{"train":4, "val":10, "test":10}]
                         variables[('model_args.alpha_on', 
                                    'model_args.omega_on',
                                    'model_args.gamma_on',
                                    'model_args.z_on')] = [(True, True, True, True)]
-                        # expath += '{backbone_channel_dim}backbonedims/'
+
+                        #template += "{model_args.alpha_on}a_{model_args.omega_on}o_" + \
+                        #            "{model_args.gamma_on}g_" + \
+                        #            "{model_args.z_on}z_{model_args.approx_until}till/"
+                        #template += '{model_args.batch_size}trainbatch_'+ \
+                        #            '{model_args.inner_loop_lr}innerlr_' + \
+                        #            '{model_args.num_inner_loop_steps}innersteps/'
                     
                     elif model == 'relationnet':
                         variables['model_args.loss_type'] = ['softmax']
-                        expath += '{model_args.loss_type}/'
-                
+                        template += '{model_args.loss_type}/'
+
                     elif model == 'simpleshot':
                         variables['task_args.train.batch_size'] = [128]
                         variables['model_args.feat_trans_name'] = ['CL2N']
                         variables['model_args.train_feat_trans'] = [False]
                         variables['model_args.approx_train_mean'] = [False]  # if true will speed up dataset mean calculation
                         
-                    expath += '{seed}/'
+                    template += '{seed}/'
                     variables.update(var_update)
                     
-                    config = get_default_config()
-                    expfiles = generate_experiments(expath, variables, config, args, save=save)
+                    expfiles = generate_experiments(template, variables, g_args, save=save)
                     experiement_files.extend(expfiles)
     return experiement_files
 
 
-def imbalanced_supports_test(args, expfiles):
+def imbalanced_task_test(g_args, expfiles):
     n_way=5
 
     test_settings = [
@@ -424,9 +384,8 @@ def imbalanced_supports_test(args, expfiles):
         (5, 5,  None, 'balanced', 15, 15, None, 'balanced'),
         (4, 6,  None, 'linear', 15, 15, None, 'balanced'),
         (1, 9,  None, 'random', 15, 15, None, 'balanced'),
-        (1, 9,  0.2,  'step', 15, 15, None, 'balanced')  
+        (1, 9,  0.2,  'step', 15, 15, None, 'balanced'),
         
-        #### Other 5 avr shot test settings
         # (3, 7,  None, 'linear', 15, 15, None, 'balanced'),
         # (2, 8,  None, 'linear', 15, 15, None, 'balanced'),
         # (1, 9,  None, 'linear', 15, 15, None, 'balanced'),
@@ -456,13 +415,12 @@ def imbalanced_supports_test(args, expfiles):
     
     for experiment in expfiles:
         
-        default_config = get_default_config()
         script, script_path, config, config_path = experiment
         
-        # substitute for backward compatibility so new code versions work on old configs
-        default_config = substitute_hyperparameters(default_config, config) 
+        # expanded args also useful for backward compatibility. 
+        config = substitute_hyperparams(config)
         
-        assert default_config['task'] == 'fsl_imbalanced'
+        assert config['task'] == 'fsl_imbalanced'
         
         for t, test_setting in enumerate(test_settings):
             test_name = test_names[t]
@@ -481,15 +439,15 @@ def imbalanced_supports_test(args, expfiles):
                 'task_args.test.imbalance_distribution',
                 'task_args.test.min_num_targets', 
                 'task_args.test.max_num_targets',
-                'task_args.test.num_minority_tagets',
+                'task_args.test.num_minority_targets',
                 'task_args.test.imbalance_distribution_targets'
             )] = [test_setting]
             
             generate_experiments(
-                default_config['experiment_name'], 
-                variables, 
-                default_config,
-                args,
+                config['experiment_name'], 
+                variables,
+                g_args,
+                default_config = config,
                 save=True,
                 config_name='config_test_on_{}'.format(test_name),
                 script_name='script_test_on_{}'.format(test_name),
@@ -497,42 +455,53 @@ def imbalanced_supports_test(args, expfiles):
             )
 
             
-def strategy_inference(args, expfiles):
+def strategy_inference(g_args, expfiles):
     n_way=5
-    
-    test_settings = [
-        (5, 5,  None, 'balanced', 16, 16, None, 'balanced'),  # K_min, K_max, N_min, I-distribution for supports, then queries
-        (4, 6,  None, 'linear', 16, 16, None, 'balanced'),
-        (1, 9,  None, 'random', 16, 16, None, 'balanced'),
-        (1, 9,  0.2,  'step', 16, 16, None, 'balanced')       # N_min expressed as a fraction of 'n_way'
+    test_tasks = [  
+        (5, 5,  None, 'balanced', 15, 15, None, 'balanced'),  # K_min, K_max, N_min, I-distribution 
+        (4, 6,  None, 'linear', 15, 15, None, 'balanced'),
+        (1, 9,  None, 'random', 15, 15, None, 'balanced'),
+        (1, 9,  0.2,  'step', 15, 15, None, 'balanced')       # N_min expressed as a fraction of 'n_way'
+        
+        # Other, uncomment if appropiate
+        # (5, 5,  None, 'balanced', 15, 15, None, 'balanced'),  # K_min, K_max, N_min, I-distribution 
+        # (4, 6,  None, 'linear', 15, 15, None, 'balanced'),
+        # (3, 7,  None, 'linear', 15, 15, None, 'balanced'),
+        # (2, 8,  None, 'linear', 15, 15, None, 'balanced'),
+        # (1, 9,  None, 'linear', 15, 15, None, 'balanced'),
+        # (1, 21,  0.8, 'step', 15, 15, None, 'balanced'),
+        # (1, 6,  0.2, 'step', 15, 15, None, 'balanced'),
+        # (1, 9,  0.8, 'step', 15, 15, None, 'balanced'),
+        # (3, 7,  None, 'random', 15, 15, None, 'balanced'),
     ]
     test_names = make_names(test_tasks, n_way, query_half=False)
     
     # Inference Strategies
     strategies = [
         'ros',
-        'ros_aug',
-        'focal_loss',
-        'weighted_loss'
+        # 'ros_aug',
+        # 'focal_loss',
+        # 'weighted_loss',
+        # 'cb_loss',
     ]
     
     for experiment in expfiles:
         for strategy in strategies:
-            default_config = get_default_config()
-            script, script_path, config, config_path = experiment
+            script, script_path, base_config, config_path = experiment
             
-            config['strategy'] = strategy
-            config['strategy_args'] = {}
+            base_config['strategy'] = strategy
+            base_config['strategy_args'] = {}
             
-            default_config = substitute_hyperparameters(default_config, config) 
+            # expanded args also useful for backward compatibility. 
+            base_config = substitute_hyperparams(base_config)
 
-            assert default_config['task'] == 'fsl_imbalanced'
-            assert default_config['strategy'] == strategy
+            assert base_config['task'] == 'fsl_imbalanced'
             
-            continue_from = os.path.join(args.dest, default_config['experiment_name'])
-            expath = 'inference/{strategy}/' + default_config['experiment_name']
-
-            for t, test_task in enumerate(test_tasks):
+            continue_from = os.path.join(g_args.results_folder, base_config['experiment_name'])
+            template = os.path.join('inference/{strategy}/', base_config['experiment_name'])
+            
+            for t, setting in enumerate(test_tasks):
+                config = copy.deepcopy(base_config)
                 test_name = test_names[t]
 
                 variables = {
@@ -550,28 +519,25 @@ def strategy_inference(args, expfiles):
                     'task_args.test.max_num_targets',
                     'task_args.test.num_minority_tagets',
                     'task_args.test.imbalance_distribution_targets'
-                )] = [test_setting]
+                )] = [setting]
                 
-                expath = 'strategy_inference/{strategy}/'
+                template = 'inference/{strategy}/'
 
                 if strategy == 'cb_loss':
-                    variables['strategy_args.beta'] = [0.8] # [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,0.99]
-                    expath += "{strategy_args.beta}beta/"
+                    variables['strategy_args.beta'] = [0.8]
+#                     template += "{strategy_args.beta}beta/"
                 
-                variables[('task_args.test.min_num_supports', 
-                       'task_args.test.max_num_supports',
-                       'task_args.test.num_minority',
-                       'task_args.test.imbalance_distribution', 
-                       'task_args.test.min_num_targets', 
-                       'task_args.test.max_num_targets',
-                       'task_args.test.num_minority_targets',
-                       'task_args.test.imbalance_distribution_targets')] = [test_task]
-
+                template += config['experiment_name']
+                
+#                 print('# ', config['experiment_name'])
+#                 print('# ', template)
+#                 print('#', config['continue_from'])
+                
                 generate_experiments(
-                    expath,
-                    variables, 
-                    default_config,
-                    args,
+                    template, 
+                    variables,
+                    g_args,
+                    default_config = config,
                     save=True,
                     config_name='config_test_on_{}'.format(test_name),
                     script_name='script_test_on_{}'.format(test_name),
@@ -579,68 +545,151 @@ def strategy_inference(args, expfiles):
                 )
             
                  
-def imbalanced_dataset(args, models=[], seeds=[], save=True, backbone=None, expfolder=""):
-    
+def imbalanced_dataset(g_args, models=[], seeds=[], save=True, backbone=None):
     # meta-training dataset imbalance settings
     imbalance_settings = [
         (300, 300, None, 'balanced'),
-        (30 , 570, None, 'random'),
         (30 , 570, None, 'linear'),
-        (30 , 570, 0.5,  'step'),
+        (30, 570, 0.5, 'step'),
+        (25, 444, 0.34375,  'step'),
+        (None, None, None, 'step-animal'),
+        
+        # Reduced Dataset
+        # (150, 150, None, 'balanced'),
+        # (30, 190, 0.25, 'step'),
+        # (30, 270,  0.5, 'step'),
+        # (30, 510, 0.75, 'step'),
     ]
     
     strategies=[None]
-    train_tasks=[(5, 5, None, 'balanced', 15, 15, None, 'balanced')]
-    var_update = {'num_epochs': [200], 'num_tasks_per_epoch': [250]}
+    train_tasks=[
+        (5, 5, None, 'balanced', 15, 15, None, 'balanced'),
+        #(1, 9, None, 'linear', 15, 15, None, 'balanced')  # uncomment for combined imbalance results
+    ]
+    var_update = {
+        'num_epochs': [200], 
+        'num_tasks_per_epoch': [500], 
+        # 'dataset_args.train.use_classes_frac': [0.5]
+    }
     
     is_baseline = lambda x: x in ['baseline', 'baselinepp', 'knn']
     
     experiement_files = []
-    for experiment in fsl_imbalanced(args, models=models, strategies=strategies, seeds=seeds, var_update=var_update,
-                          train_tasks=train_tasks, save=False, backbone=backbone, expfolder=expfolder):
-        
-        script, script_path, config, config_path = experiment
-        default_config = get_default_config()
-        default_config = substitute_hyperparameters(default_config, config)
-        model = default_config['model']
-        
+
+    for experiment in fsl_imbalanced(g_args, models=models, strategies=strategies, 
+                                     seeds=seeds, var_update=var_update,
+                                     train_tasks=train_tasks, save=False, 
+                                     backbone=backbone):
+
         for setting in imbalance_settings:
+            script, script_path, config, config_path = experiment
+
+            # expanded args also useful for backward compatibility. 
+            config = substitute_hyperparams(config)
+            model = config['model']
             min_s, max_s, minor, dist  = setting
             
-            variables = {
+            variables = {}
+            
+            if dist == 'step-animal':
+                variables.update({'dataset_args.train.dataset_version' : ['step-animal']})
+                dist = None
+                
+            variables.update({
                 'dataset_args.train.min_num_samples'       :[min_s],
                 'dataset_args.train.max_num_samples'       :[max_s],
                 'dataset_args.train.num_minority'          :[minor],
                 'dataset_args.train.imbalance_distribution':[dist],
-                'conventional_split'                       :[is_baseline(model)],
-                'conventional_split_from_train_only'       :[is_baseline(model)]
-            }
+            })
             
-            expath = default_config['experiment_name']
+            if is_baseline(model):
+                variables.update({
+                    'no_val_loop'                       :[True],  # no validation loop for baselines
+                    'conventional_split'                :[False],
+                    'conventional_split_from_train_only':[False],
+                })
+            
+            template = os.path.join('imb_mini','{dataset_args.train.min_num_samples}_'+\
+                                    '{dataset_args.train.max_num_samples}_'+\
+                                    '{dataset_args.train.num_minority}_'+\
+                                    '{dataset_args.train.imbalance_distribution}',
+                                    config['experiment_name'])
             
             experiement_files.extend(generate_experiments(
-                expath, 
-                variables, 
-                default_config,
-                args,
-                save=save
+               template, 
+               variables, 
+               g_args,
+               default_config=config,
+               save=save
             ))
     return experiement_files
 
-            
-def cub_inference(args, expfiles, save=True):
+
+def tailed_dataset(g_args, models=[], seeds=[], save=True, backbone='Conv4'):
+    
+    # meta-training dataset imbalance settings
     datasets = [
-        'mini_to_cub'
+        "imgnt"
+    ]
+    dataset_versions = [
+        "longtail",
+        "balanced",
     ]
     
-    for dateset in datasets:
+    strategies=[None]
+    train_tasks=[(5, 5, None, 'balanced', 15, 15, None, 'balanced')]
+    var_update = {'num_epochs': [200], 'num_tasks_per_epoch': [1000]}
+    
+    is_baseline = lambda x: x in ['baseline', 'baselinepp', 'knn']
+    
+    experiement_files = []
+    
+    for dataset in datasets:
+        for version in dataset_versions:
+            for experiment in fsl_imbalanced(g_args, models=models, strategies=strategies, seeds=seeds, var_update=var_update,
+                                             train_tasks=train_tasks, save=False, dataset=dataset, backbone='ResNet10', 
+                                             template_prefix=''):
+                script, script_path, config, config_path = experiment
+                # expanded args also useful for backward compatibility.
+                config = substitute_hyperparams(config)
+                
+                template = os.path.join('imb_{dataset}/{dataset_args.dataset_version}/', config['experiment_name'])
+                
+                experiement_files.extend(generate_experiments(
+                    template,
+                    {
+                        "dataset"                            : [dataset],
+                        "dataset_args.dataset_version"       : [version],
+                        'dataset_args.imbalance_distribution': [None],
+                        "dataset_args.seed"                  : [config['seed']],
+                        'no_val_loop'                        : [is_baseline(config['model'])],
+                        'conventional_split'                 : [False],
+                        'conventional_split_from_train_only' : [False]
+                    }, 
+                    g_args,
+                    config,
+                    save=save
+                ))
+            
+    return experiement_files
+
+            
+def cub_inference(g_args, expfiles, save=True):
+    
+    datasets = [
+        ('cub_inf', 'mini_to_cub')
+    ]
+    
+    for prefix, dateset in datasets:
         
         for experiment in expfiles:
             script, script_path, config, config_path = experiment
-            default_config = get_default_config()
-            default_config = substitute_hyperparameters(default_config, config)
-            continue_from = os.path.join(args.dest, default_config['experiment_name'])
-            expath = 'cub_inference/{dataset}/' + default_config['experiment_name']
+            config = copy.deepcopy(base_config)
+            
+            # expanded args also useful for backward compatibility. 
+            config = substitute_hyperparams(config)
+            continue_from = os.path.join(g_args.results_folder, config['experiment_name'])
+            template = os.path.join(prefix,config['experiment_name'])
             
             variables = {
                 'continue_from' : [continue_from],
@@ -648,21 +697,21 @@ def cub_inference(args, expfiles, save=True):
                 'evaluate_on_test_set_only': [True],
                 'dataset_args.test.imbalance_distribution': [None],
             }
-
+            
             generate_experiments(
-                expath,
+                template,
                 variables, 
-                default_config,
-                args,
+                g_args,
+                config,
                 save=True
             )
             
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--gpu', default='{gpu}', help='GPU ID')
+    parser.add_argument('--gpu', default=['{gpu}'], type=str, nargs="+", help='GPU ID')
     parser.add_argument('--dummy_run', type=str2bool, nargs='?', const=True, default=False,
-                        help='Produces a scripts as a dry run with reduced number of tasks, '
-                             'and no saving (useful for debugging)')
+                        help='Produces scripts as a "dry run" with a reduced number of tasks, '
+                             'and no mobel saving (useful for debugging)')
     parser.add_argument('--data_path', type=str, default='./data/',
                         help='Folder with data')
     parser.add_argument('--models', '--model', type=str, nargs="*", default=[],
@@ -673,7 +722,7 @@ if __name__ == '__main__':
                         help='See ./src/utils/utils.py file for a list of valid backbones.')
     parser.add_argument('--seeds', '--seed', type=int, nargs="*", default=[],
                         help='Generate experiments using selected seed numbers')
-    parser.add_argument('--dest', type=str, default='./experiments/',
+    parser.add_argument('--results_folder', type=str, default='./experiments/',
                         help='Folder for saving the experiment config/scripts/logs into')
     parser.add_argument('--imbalanced_supports', type=str2bool, nargs='?', const=True, default=False,
                         help='Generate imbalanced support set experiments')
@@ -682,10 +731,10 @@ if __name__ == '__main__':
     parser.add_argument('--imbalanced_dataset', type=str2bool, nargs='?', const=True, default=False,
                         help='Generate imbalanced dataset experiments')
     parser.add_argument('--tailed_dataset', type=str2bool, nargs='?', const=True, default=False,
-                        help='Generate imbalanced dataset experiments with long-tail distribution')
+                        help='Generate imbalanced dataset experiments with a long-tail distribution')
     parser.add_argument('--dataset', type=str, default='mini')
     parser.add_argument('--slow_learning', type=str, nargs='?', const=True, default=False,
-                        help='If true, runs a lot more epochs')
+                        help='If true, runs slower learning rate.')
     parser.add_argument('--load_backbone', type=str, nargs='?', const=True, default=False,
                         help='If true, loads backbone of a Baseline++ model.')
     parser.add_argument('--test', type=str2bool, nargs='?', const=True, default=False,
@@ -698,49 +747,51 @@ if __name__ == '__main__':
                         help='Prints bash scripts instead of python')
     parser.add_argument('--minimal', type=str2bool, nargs='?', const=True, default=False,
                         help='Generate minimal experiments.')
-    args = parser.parse_args()
+    g_args = parser.parse_args()
     
+    g_args.results_folder = os.path.abspath(g_args.results_folder)
     
-    if args.models is None or len(args.models) == 0:
+    GPU_COUNTER = 0    
+
+    if g_args.models is None or len(g_args.models) == 0:
         models = [
-            'protonet',
-            'relationnet',
-            'matchingnet',
-            'dkt',
-            'simpleshot',
             'baseline',
             'baselinepp',
-            'knn',
+            'matchingnet',
+            'relationnet',
+            'protonet',
+            'dkt',
+            'simpleshot',
             'maml',
             'protomaml',
-            'bmaml',
-            'bmaml_chaser',
-            # 'btaml',  # -- left out due to an obvious implementation error
+            'btaml',
+            # 'bmaml',
+            # 'bmaml_chaser',
+            # 'knn',
         ]
     else:
-        models = args.models
+        models = g_args.models
         
-    if args.strategies is None or len(args.strategies) == 0:
+    if g_args.strategies is None or len(g_args.strategies) == 0:
         strategies = [
             None,
             'ros',
             'ros_aug',
-            # 'focal_loss',
-            # 'weighted_loss',
-            # 'cb_loss'
+            'focal_loss',
+            'weighted_loss',
+            'cb_loss'
         ]
     else:
-        strategies = [ None if s in ['None','none'] else s for s in args.strategies]
-        
+        strategies = [ None if s in ['None','none'] else s for s in g_args.strategies]
     
-    if args.seeds is None or len(args.seeds) == 0:
+    if g_args.seeds is None or len(g_args.seeds) == 0:
         seeds = [
             0,
             1, 
             2
         ]
     else:
-        seeds = args.seeds
+        seeds = g_args.seeds
         
     balanced_tasks = [
         (5, 5, None, 'balanced', 15, 15, None, 'balanced'),  # Standard Meta-Training
@@ -753,47 +804,58 @@ if __name__ == '__main__':
         # (1, 29, None, 'random', 15, 15, None, 'balanced'),  # -- uncomment if appropiate
         # (1, 49, None, 'random', 15, 15, None, 'balanced'),  # -- uncomment if appropiate
     ]
-        
-    if args.minimal:
+    
+    if g_args.minimal:
         models = models[:2]
         strategies = strategies[:2]
         seeds = seeds[:1]
     
     
     backbone = None
-    if args.load_backbone:
-        backbone_files = fsl_imbalanced(args, models=['baselinepp'], strategies=[None], seeds=seeds, train_tasks=[
+    if g_args.load_backbone:
+        backbone_files = fsl_imbalanced(g_args, models=['baselinepp'], strategies=[None], seeds=seeds, train_tasks=[
            (5, 5, None, 'balanced', 15, 15, None, 'balanced')], save=False, expfolder='imbalanced_supports/', 
-                                        backbone=args.backbone, dataset=args.dataset)
+                                        backbone=g_args.backbone, dataset=g_args.dataset)
         _, _, config, _ = backbone_files[0]
         backbone = config['experiment_name']
         backbone = "/media/disk2/mateusz/repositories/imbalanced_fsl_dev/experiments/imbalanced_task/mini/Conv4/"+\
                     "train_on_5-5shot_balanced_None/baseline/0/checkpoint/epoch-199"
     
     
-    if args.imbalanced_supports:
+    if g_args.imbalanced_supports:
         # Standard meta-training
-        standard_expfiles = fsl_imbalanced(args, models=models, strategies=[None], seeds=seeds, train_tasks=balanced_tasks,
-                                save=not (args.test or args.inference), expfolder='imbalanced_supports/', 
-                                           pretrained_backbone=backbone, slow_learning=args.slow_learning, 
-                                        backbone=args.backbone, dataset=args.dataset)
+        standard_expfiles = fsl_imbalanced(g_args, models=models, strategies=[None], seeds=seeds, train_tasks=balanced_tasks,
+                                save=not (g_args.test or g_args.inference), expfolder='imbalanced_supports/', 
+                                           pretrained_backbone=backbone, slow_learning=g_args.slow_learning, 
+                                        backbone=g_args.backbone, dataset=g_args.dataset)
         # Random Shot meta-training
-        randomshot_expfiles = fsl_imbalanced(args, models=models, strategies=strategies, seeds=seeds,
-                                             train_tasks=imbalanced_tasks, save=not (args.test or args.inference), 
+        randomshot_expfiles = fsl_imbalanced(g_args, models=models, strategies=strategies, seeds=seeds,
+                                             train_tasks=imbalanced_tasks, save=not (g_args.test or g_args.inference), 
                                              expfolder='imbalanced_supports/', pretrained_backbone=backbone, 
-                                             slow_learning=args.slow_learning, backbone=args.backbone, dataset=args.dataset)
+                                             slow_learning=g_args.slow_learning, backbone=g_args.backbone, 
+                                             dataset=g_args.dataset)
         
-        if args.test: 
-            imbalanced_supports_test(args, standard_expfiles)
-            imbalanced_supports_test(args, randomshot_expfiles)
+        if g_args.test: 
+            imbalanced_task_test(g_args, standard_expfiles)
+            imbalanced_task_test(g_args, randomshot_expfiles)
             
-        if args.inference:
-            strategy_inference(args, standard_expfiles)
-            strategy_inference(args, randomshot_expfiles)
+        if g_args.inference:
+            strategy_inference(g_args, standard_expfiles)
+            strategy_inference(g_args, randomshot_expfiles)
     
     
-    if args.imbalanced_targets:
-        # Standard meta-training
+    if g_args.imbalanced_dataset:
+        expfiles = imbalanced_dataset(g_args, models=models, seeds=seeds, save=not (g_args.test or g_args.inference), 
+                                        backbone=g_args.backbone)
+        
+        if g_args.test:
+            print('Balanced task testing is performed automatically after training. Use --inference to evaluate on CUB.')
+        
+        if g_args.inference:
+            cub_inference(g_args,expfiles)
+            
+    
+    if g_args.imbalanced_targets:
         train_tasks = [
             (5, 5, None, 'balanced', 5, 5, None, 'balanced'),
             (5, 5, None, 'balanced', 1, 9, None, 'linear'),
@@ -801,31 +863,33 @@ if __name__ == '__main__':
             (1, 9, None, 'linear', 1, 9, None, 'linear'),
         ]
         
-        test_task = (1, 9, None, 'linear', 5, 5, None, 'balanced')
+        test_tasks = [
+            (1, 9, None, 'linear', 5, 5, None, 'balanced')
+        ]
         
-        expfiles = fsl_imbalanced(args, models=models, strategies=[None], seeds=seeds, train_tasks=train_tasks, 
-                                  test_tasks=[test_task], save=not(args.test or args.inference), 
+        expfiles = fsl_imbalanced(g_args, models=models, strategies=[None], seeds=seeds, train_tasks=train_tasks, 
+                                  test_tasks=test_tasks, save=not(g_args.test or g_args.inference), 
                                   expfolder='imbalanced_targets/', pretrained_backbone=backbone, 
-                                  slow_learning=args.slow_learning, backbone=args.backbone,dataset=args.dataset)
+                                  slow_learning=g_args.slow_learning, backbone=g_args.backbone, dataset=g_args.dataset)
         
-        if args.test:
-            print('# Experiments are automatically tested on 1-9shot linear, 5-5query balanced after each train task setting')
+        if g_args.test:
+            imbalanced_target_test(g_args, expfiles)
             
-        if args.inference:
-            print('# Not implemented')
+        if g_args.inference:
+            print('Strategy inference for imbalnaced target set not yet implemented.')
+    
+    
+    if g_args.tailed_dataset:
+        expfiles = tailed_dataset(g_args, models=models, seeds=seeds, save=not (g_args.test or g_args.inference), 
+                                        backbone=g_args.backbone)
+        
+        if g_args.test:
+            print('Testing performed automatically after training')
+        
+        if g_args.inference:
+            print('No inference experiments')
             
     
-    if args.imbalanced_dataset:
-        expfiles = imbalanced_dataset(args, models=models, seeds=seeds, save=not (args.test or args.inference), 
-                                        backbone=args.backbone, expfolder='imbalanced_dataset/')
-        
-        if args.test:
-            print('Balanced task testing is performed automatically after training. Use --inference to evaluate on CUB.')
-        
-        if args.inference:
-            cub_inference(args,expfiles)
-            
-    
-    if not (args.imbalanced_dataset or args.imbalanced_supports or args.imbalanced_targets):
-        print('# Please specify --imbalanced_dataset or --imbalanced_supports, or see --help')
-        
+    if not (g_args.imbalanced_dataset or g_args.imbalanced_supports or g_args.imbalanced_targets or g_args.tailed_dataset):
+        print('Please specify --imbalanced_dataset or --imbalanced_supports')
+

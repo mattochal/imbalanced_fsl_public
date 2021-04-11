@@ -1,4 +1,3 @@
-import models.backbones as backbones
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
@@ -13,7 +12,8 @@ import argparse
 class MatchingNet(ModelTemplate):
     
     @staticmethod
-    def get_parser(parser = argparse.ArgumentParser(description='MatchingNet')):
+    def get_parser(parser=None):
+        if parser is None: parser = argparse.ArgumentParser(description='MatchingNet')
         """
         returns a parser for the given model. Can also return a subparser
         """

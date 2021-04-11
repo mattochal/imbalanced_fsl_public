@@ -6,7 +6,8 @@ import math
 class SimpleBatchTask(TaskTemplate):
         
     @staticmethod
-    def get_parser(parser=argparse.ArgumentParser()):
+    def get_parser(parser=None):
+        if parser is None: parser=argparse.ArgumentParser()
         parser.add_argument('--batch_size', type=int, default=32)
         return parser
     

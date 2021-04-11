@@ -265,13 +265,19 @@ def mono_transform(augment, normalise, image_width, image_height, toPIL=False):
 
 
 def prep_datasets(datasets, general_args, conventional_split=False, from_train_only=False):
+    """
+    behaviour: 
+        option 1. Using the val and train datasets as given.
+        option 2. Combine val and train classes, and then repartition the samples using conventional 80/20 split
+        option 3. If train dataset is smaller than original, use leftovers from new train dataset to create val dataset
+    """
     
     new_datasets = {}
+    splits = ["train", "val", "test"]
     
-    if (conventional_split and from_train_only):
+    if (conventional_split and from_train_only and datasets['train'][2].imbalance_distribution is None):  # option 3
         image_data, class_dict, args, dataset_class = datasets['train']
-        new_image_data, new_class_dict, extra_image_data, extra_class_dict = prep_data(image_data, class_dict, args, 
-                                                                                       extra_samples=True)
+        new_image_data,new_class_dict,extra_image_data,extra_class_dict=prep_data(image_data,class_dict,args,extra_samples=True)
         new_datasets['train'] = dataset_class(new_image_data, new_class_dict, args)
         print("{} dataset contains: {} images, {} classes".format('train', len(new_image_data), len(new_class_dict)))
         
@@ -279,26 +285,20 @@ def prep_datasets(datasets, general_args, conventional_split=False, from_train_o
         datasets['val'][0] = extra_image_data
         datasets['val'][1] = extra_class_dict
         
-        for split in ["val", "test"]:
-            image_data, class_dict, args, dataset_class = datasets[split]
-            new_image_data, new_class_dict = prep_data(image_data, class_dict, args)
-            new_datasets[split] = dataset_class(new_image_data, new_class_dict, args)
-            print("{} dataset contains: {} images, {} classes".format(split, len(new_image_data), len(new_class_dict)))
-    
-    else:
+        splits = ["val", "test"]
+   
+    elif conventional_split: # option 2
+        data1 = datasets['train'][:2]
+        data2 = datasets['val'][:2]
+        newdata1, newdata2 = merge_train_val_and_conventional_split(data1, data2)
+        datasets['train'][:2] = newdata1
+        datasets['val'][:2] = newdata2
         
-        if (conventional_split and not from_train_only):
-            data1 = datasets['train'][:2]
-            data2 = datasets['val'][:2]
-            newdata1, newdata2 = merge_train_val_and_conventional_split(data1, data2)
-            datasets['train'][:2] = newdata1
-            datasets['val'][:2] = newdata2
-        
-        for split in ["train", "val", "test"]:
-            image_data, class_dict, args, dataset_class = datasets[split]
-            new_image_data, new_class_dict = prep_data(image_data, class_dict, args)
-            new_datasets[split] = dataset_class(new_image_data, new_class_dict, args)
-            print("{} dataset contains: {} images, {} classes".format(split, len(new_image_data), len(new_class_dict)))
+    for split in splits: # default
+        image_data, class_dict, args, dataset_class = datasets[split]
+        new_image_data, new_class_dict = prep_data(image_data, class_dict, args)
+        new_datasets[split] = dataset_class(new_image_data, new_class_dict, args)
+        print("{} dataset contains: {} images, {} classes".format(split, len(new_image_data), len(new_class_dict)))
             
     return new_datasets
 
@@ -328,7 +328,7 @@ def prep_data(image_data, class_dict, args, extra_samples=False):
         class_labels = sorted(class_labels)
         
         if extra_samples:
-            # Get samples which will be used for validation
+            # Get extra samples which will be used for validation
             min_samples_per_class = min([ len(class_dict[label]) for label in class_labels ])
             extra_sample_per_class = max(0, min_samples_per_class - num_samples.max())
             

@@ -1,4 +1,6 @@
 import os
+os.environ['PYTHONUNBUFFERED'] = '1'
+
 import shutil
 import time
 import json
@@ -22,9 +24,12 @@ import numpy as np
 
 # Performance Tracker
 from utils.ptracker import PerformanceTracker
+from utils.parser_utils import *
+from utils.bunch import bunch
 
 # Backbones
-import models.backbones as backbones
+from backbones.conv import Conv4, Conv6, Conv4NP, Conv6NP
+from backbones.resnet import ResNet10, ResNet18, ResNet34, ResNet50, ResNet101
 
 # Imbalance Distributions
 from tasks.imbalance_utils import IMBALANCE_DIST
@@ -37,6 +42,7 @@ from tasks.batch_simple import SimpleBatchTask
 # Datasets
 from datasets.mini import get_MiniImageNet
 from datasets.cub import get_CUB200
+from datasets.imgnt import get_ImageNet
 from datasets.mini_to_cub import get_MiniImageNet_to_CUB200
 from datasets.custom import get_custom_dataset_from_folders
 from datasets.dataset_utils import prep_datasets
@@ -73,6 +79,7 @@ TASKS = {
 DATASETS = {
     "mini"       : get_MiniImageNet,
     "cub"        : get_CUB200,
+    "imgnt"      : get_ImageNet,
     "mini_to_cub": get_MiniImageNet_to_CUB200,
     "custom"     : get_custom_dataset_from_folders
 }
@@ -91,40 +98,39 @@ MODELS = {
     "bmaml"       : BayesianMAML,
     "bmaml_chaser": BayesianMAMLChaser,
     "btaml"       : BayesianTAML,
-    "knn"         : KNN,
+    "knn"         : KNN
 }
 
 BACKBONES = {
-    "Conv4"    : backbones.Conv4,
-    "Conv6"    : backbones.Conv6,
-    "ResNet10" : backbones.ResNet10,
-    "ResNet18" : backbones.ResNet18,
-    "ResNet34" : backbones.ResNet34,
-    "ResNet50" : backbones.ResNet50,
-    "ResNet101": backbones.ResNet101
+    "Conv4"    : Conv4,
+    "Conv6"    : Conv6,
+    "ResNet10" : ResNet10,
+    "ResNet18" : ResNet18,
+    "ResNet34" : ResNet34,
+    "ResNet50" : ResNet50,
+    "ResNet101": ResNet101
 }
 
 STRATEGIES = {
-    "ros"          : ROS,
-    "ros_aug"      : ROS_AUG,
-    "weighted_loss": WeightedLoss,
-    "focal_loss"   : FocalLoss,
-    "cb_loss"      : CBLoss,
-    None           : StrategyTemplate
+    "ros"           : ROS,
+    "ros_aug"       : ROS_AUG,
+    "weighted_loss" : WeightedLoss,
+    "focal_loss"    : FocalLoss,
+    "cb_loss"       : CBLoss,
+    None            : StrategyTemplate
 }
 
-def get_main_parser(optional=None):
+def get_base_parser(*args, **kwargs):
     """
     Main parser
     """
-    parser=argparse.ArgumentParser(
-        description="FSL Pytorch Framework",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
+    parser=argparse.ArgumentParser(*args, **kwargs)
+#         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+#     )
     
-    parser.add_argument('--help_all', '--help_model', '--help_dataset', '--help_strategy', '--help_task', '--help_ptracker',
-                        action=PrintHelpAction, nargs=0,
-                        help="Print help for given model, dataset, task, strategy args")
+#     parser.add_argument('--help_all', '--help_model', '--help_dataset', '--help_strategy', '--help_task', '--help_ptracker',
+#                         action=PrintHelpAction, nargs=0,
+#                         help="Print help for given model, dataset, task, strategy args")
     
     parser.add_argument('--task', type=str, default='fsl', choices=TASKS.keys(),
                         help='Task name')
@@ -136,15 +142,6 @@ def get_main_parser(optional=None):
                         help='Backbone neural network name')
     parser.add_argument('--strategy', type=str, default=None, choices=STRATEGIES.keys(),
                        help='Imbalance strategy. If None, no imbalance strategy is used')
-    
-    parser.add_argument('--model_args', type=json.loads, default=dict(),
-                        help='FSL method settings as a json parsable string')
-    parser.add_argument('--dataset_args', type=json.loads, default=dict(),
-                        help='Dataset settings as a json parsable string')
-    parser.add_argument('--task_args', type=json.loads, default=dict(),
-                        help='Task settings as a json parsable string')
-    parser.add_argument('--strategy_args',  type=json.loads, default=dict(),
-                       help='Imbalance strategy settings as a json parsable string')
     
     parser.add_argument('--gpu', default='0',
                         help='gpu number or "cpu"')
@@ -161,9 +158,9 @@ def get_main_parser(optional=None):
                         help='Clears the experiment folder if it exisits')
     parser.add_argument('--storage_friendly', type=str2bool, nargs='?', const=True, default=True,
                         help='Deletes previously saved models systematically, only keeps best, latest model')
+    parser.add_argument('--data_path', type=str, default="data/", 
+                        help='Data folder with datasets in named subdirectories.')
     
-    parser.add_argument('--args_file', type=str, default="None", 
-                        help="file path to json configuration file")
     parser.add_argument('--continue_from', type=str, default=None, 
                         help="Continue from a checkpoint file, epoch, or 'latest', 'best', or 'from_scratch'/None.")
     parser.add_argument('--load_backbone_only', type=str2bool, nargs='?', const=True, default=False,
@@ -180,8 +177,8 @@ def get_main_parser(optional=None):
                              ' data.dataset_utils.prep_datasets() for details.')
     parser.add_argument('--backbone_channel_dim', type=int, default=64,
                        help='Number of channels of the backbone model.')
-    parser.add_argument('--disable_tqdm', type=str2bool, nargs='?', const=True, default=True,
-                       help="Disable tqdm, especially useful when running experiment and redirecting to files")
+    parser.add_argument('--tqdm', type=str2bool, nargs='?', const=True, default=False,
+                       help="Enable/Disable tqdm, especially useful when running experiment and redirecting to files")
     
     group = parser.add_argument_group('TASK SAMPLING OPTIONS')
     group.add_argument('--num_epochs', type=int, default=100, 
@@ -195,6 +192,8 @@ def get_main_parser(optional=None):
                         help="If present, no (further) training is performed and only the test dataset is evaluated.")
     group.add_argument('--val_or_test',  type=str, choices=["test","val"], default="val", 
                         help="Dataset to perform validation on. Default val")
+    group.add_argument('--no_val_loop',  type=str2bool, nargs='?', const=True, default=False, 
+                        help="No validation loop. Default=False, meaning assume there is a validation loop.")
     group.add_argument('--test_performance_tag', type=str, default="test", 
                         help='The tag name for the performance file evaluated on test set, eg "test" in epoch-###_test.json')
     
@@ -204,10 +203,6 @@ def get_main_parser(optional=None):
                         'on the same set of classes between tasks.')
     group.add_argument('--count_samples_stats', type=str2bool, nargs='?', const=True, default=False,
                        help='If true, counts the images and stores the distribution stats of images shown during the run')
-    
-    group = parser.add_argument_group('PERFORMANCE TRACKING')
-    group.add_argument('--ptracker_args', type=json.loads, default=dict(),
-                        help='Task arguments as a json parsable string')
     return parser
 
 
@@ -221,7 +216,7 @@ def get_dataset_parser(dataset_name, parser=None):
         raise Exception("Dataset not found: {}".format(dataset_name))
         
     parser.add_argument('--dataset_version', type=str, default=None)  
-    parser.add_argument('--data_path',  type=str, default="../data/", # default="../../data/", 
+    parser.add_argument('--data_path',  type=str, default=None,
                         help="Path to folder with all datasets.")
     parser.add_argument('--aug', type=str2bool, nargs='?', const=True, default=False, 
                        help='Boolean for data augmentation. '
@@ -236,11 +231,11 @@ def get_dataset_parser(dataset_name, parser=None):
                         help='image height')
     parser.add_argument('--image_channels', type=int, default=3,
                         help='image channels')
-    parser.add_argument('--min_num_samples', type=int, default=1,
+    parser.add_argument('--min_num_samples', type=int, default=None,
                         help="Minimum number of samples per class")
-    parser.add_argument('--max_num_samples', type=int, default=10,
+    parser.add_argument('--max_num_samples', type=int, default=None,
                         help="Max number of samples per class")
-    parser.add_argument('--num_minority', type=float, default=1,
+    parser.add_argument('--num_minority', type=float, default=None,
                         help="Fraction of classes used as minority classes (used with 'step'-imbalance distribution)")
     parser.add_argument('--imbalance_distribution', type=str, choices=IMBALANCE_DIST, default=None,
                         help="Imbalance type, specifies how to sample images from larger meta-training dataset.")
@@ -252,73 +247,108 @@ def get_dataset_parser(dataset_name, parser=None):
     
     return parser
 
-    
-def get_raw_args(parser, stdin_list=None, args_dict=dict()):
+
+def get_args(sysargv=None, json_args=None):
     """
     Gets parameters passed from the stdin or stdin_list or arg_dict, and loads parameters from a file if available
-    Arguments passed through arg_dict take priority over stdin or stdin_list, and args_file
-    Arguments passed through stdin or stdin_list take priority over args_
+    Arguments passed through sys.argv take priority over config file args and default parser args
+    Arguments passed through config file take priority over default parser args
     """
-    args = parser.parse_args(stdin_list) # default args (or generated by parsing stdin_list)
-    args_vars = vars(args)
-    args_vars.update(args_dict)
+#     pprint.pprint(sysargv)
+#     pprint.pprint(json_args), 
+#     import pdb; pdb.set_trace()
     
-    stdin_list = sys.argv if stdin_list is None else stdin_list
-    stdin_list_keys = [arg[2:] for arg in stdin_list if arg.startswith("--") \
-                       and arg not in ["--dataset_args", "--model_args", "--task_args", "--ptracker_args", "--strategy_args"]]
+    if sysargv is None:
+        sysargv = sys.argv
     
-    # Update args from file if available
-    if args.args_file not in ["None", None, ""]: 
-        
-        # Stores expandable args (those generated by nested parsers) in a separete variable to sort out later
-        args_vars["_dataset_args"] = args.dataset_args
-        args_vars["_model_args"] = args.model_args
-        args_vars["_task_args"] = args.task_args
-        args_vars["_ptracker_args"] = args.ptracker_args
-        args_vars["_strategy_args"] = args.strategy_args
+    config_parser = argparse.ArgumentParser(add_help=False)
+    config_parser.add_argument('--args_file', type=str, default=None)
     
-        args_json = extract_args_from_file(args.args_file, to_ignore=stdin_list_keys)
-        args_vars.update(args_json)
-        
-    args = sortout_ptracker_args(args)
+    base_parser = get_base_parser(description="FSL Pytorch Framework", add_help=False, parents=[config_parser])
+    
+    # Step 1. Get config file
+    config_args, remaining_argv = config_parser.parse_known_args(sysargv)
+    config_args = vars(config_args)
+            
+    if json_args is None and config_args['args_file'] not in [None,'None','none','']:
+        json_args = load_json(config_args['args_file'])
+        json_args = from_syntactic_sugar(json_args)
+        json_args['args_file'] = config_args['args_file']
+    
+    elif json_args is None:
+        json_args = {}
+    
+    # Step 2. Update base args defaults using json
+    default_args = vars(base_parser.parse_args([]))
+    default_args, excluded_args = update_dict_exclusive(default_args, json_args)
+    base_parser.set_defaults(**default_args)
+    
+    # Step 3. Update base args using command line args
+    base_args, remaining_argv = base_parser.parse_known_args(remaining_argv)
+    base_args = vars(base_args)
+    
+    # Step 4. Initilize nested parsers
+    model= base_args['model']
+    strategy= base_args['strategy']
+    dataset= base_args['dataset']
+    task= base_args['task']
+    
+    model_parser = MODELS[model].get_parser(argparse.ArgumentParser())
+    strategy_parser = STRATEGIES[strategy].get_parser(argparse.ArgumentParser())
+    data_parser = get_dataset_parser(dataset)
+    task_parsers = {_phase:_class.get_parser() for _phase,_class in get_task_classes(task, model).items()}
+    ptracker_parser = PerformanceTracker.get_parser()
+    
+    nested_parsers = argparse.ArgumentParser(description="Nested Parser", parents=[base_parser], add_help=False)
+    nested_parsers.add_argument('--model_args', **OnePhaseDict.TYPE(), subparser=model_parser,
+                               help='FSL method settings as a json parsable string (one phase args)')
+    nested_parsers.add_argument('--strategy_args', **OnePhaseDict.TYPE(), subparser=strategy_parser,
+                               help='Imbalance strategy settings as a json parsable string (one phase args)')
+    nested_parsers.add_argument('--dataset_args', **ThreePhaseDict.TYPE(), subparser=data_parser,
+                               help='Dataset settings as a json parsable string (three phase args)')
+    nested_parsers.add_argument('--ptracker_args', **ThreePhaseDict.TYPE(), subparser=ptracker_parser,
+                               help='Task arguments as a json parsable string (three phase args)')
+    nested_parsers.add_argument('--task_args', **ThreePhaseDict.TYPE(), subparser=task_parsers,
+                               help='Task settings as a json parsable string (three phase args)')
+    
+    # Step 5. Translate and expand nested args in excluded args
+    is_three_phase = {a.dest:type(a) is ThreePhaseDict for a in nested_parsers._actions}
+    for k in excluded_args.keys():
+        if k in is_three_phase and is_three_phase[k]:
+            excluded_args[k] = expand_three_phase(excluded_args[k])
+    
+    # Step 6. Updated nested args defaults using base_args
+    default_args = vars(nested_parsers.parse_args([]))
+    default_args, _excluded = update_dict_exclusive(default_args, base_args)
+    assert _excluded == {}, "This should be empty. Something must have gone wrong."
+    default_args, excluded_args = update_dict_exclusive(default_args, excluded_args)
+    nested_parsers.set_defaults(**default_args)
+    
+    # Step 7. Update nested args using command line args
+    nested_args, remaining_argv = nested_parsers.parse_known_args(remaining_argv)
+    nested_args = vars(nested_args)
+    
+    # Step 8. Delete excluded args left over by nestedparsers
+    for k in list(nested_args.keys()):
+        if isinstance(nested_args[k], abc.Mapping) and \
+           '__excluded' in nested_args[k]:
+            if k not in excluded_args:
+                excluded_args[k] = {}
+            excluded_args[k] = update_dict(excluded_args[k], nested_args[k]['__excluded'])
+            if excluded_args[k] == {}: del excluded_args[k]
+            del nested_args[k]['__excluded']
        
-    # Dummy run settings for testing purposes
-    if 'dummy_run' in args_vars and args_vars['dummy_run']:
-        args_vars.update(dict(
+    # Dry run settings for testing purposes
+    if 'dummy_run' in nested_args and nested_args['dummy_run']:
+        nested_args.update(dict(
             num_epochs=1,
             num_tasks_per_epoch=3,
             num_tasks_per_validation=3,
             num_tasks_per_testing=3
         ))
-        
-    args = Bunch(args_vars)
     
-    os.environ['PYTHONUNBUFFERED'] = '1'  # good formatting 
-    
-    print(" -------------- GIVEN ARGS -------------")
-    pprint.pprint(args.__dict__, indent=2)
-    print(" ---------------------------------------")
-    return args
-    
-    
-def extract_args_from_file(json_file, to_ignore=[]):
-    """
-    Extracts arguments from a json file. 
-    Omits to_ignore list of hyperparameters so that the ones specified from the console take priority.
-    """
-    print("Loading args from json file")
-    summary_filename = json_file
-    
-    with open(summary_filename) as f:
-        args_json = json.load(fp=f)
-    
-    print("Ignoring", to_ignore)
-    for arg in to_ignore:
-        if arg in args_json:
-            del args_json[arg]
-    
-    return args_json
-    
+    return nested_args, excluded_args, nested_parsers
+
         
 def set_torch_seed(seed):
     """
@@ -342,43 +372,22 @@ def set_gpu(x):
 def get_data(args):
     """
     Loads and returns dataset objects for each experiment stage (train, val, test).
-    Sorts out dataset_args
     """
     print("Getting data: {}".format(args.dataset))
     
-    if args.dataset not in DATASETS:
-        raise Exception("Dataset '{0}' does not exist! ".format(args.dataset))
-        
-    # Set dataset seed
-    if 'seed' not in args['dataset_args'] or args['dataset_args']['seed'] < 0:
-        args['dataset_args']['seed'] = args.seed
+    for phase in args.dataset_args.keys():
+        if 'seed' not in args.dataset_args[phase] or args.dataset_args[phase]['seed'] < 0:
+            args.dataset_args[phase]['seed'] = args.seed
+        if 'data_path' not in args.dataset_args[phase] or args.dataset_args[phase]['data_path'] is None:
+            args.dataset_args[phase]['data_path'] = args.data_path
     
-    # Update parameters
-    args.dataset_args = get_full_dataset_args(
-        args.dataset,
-        convert_to_nested_dict(args.dataset_args)
-    )
-    
-    # Update parameters 2nd time if _dataset_args in args
-    if "_dataset_args" in args:
-        args.dataset_args = get_full_dataset_args(
-            args.dataset,
-            convert_to_nested_dict(args._dataset_args),
-            default_args = args.dataset_args
-        )
-        del args._dataset_args
-        
-    args.dataset_args = toBunch(args.dataset_args)
-    datasets = DATASETS[args.dataset](args.dataset_args)
-    
-    if (args.conventional_split is None and \
-        args.model in ["baseline", "baselinepp", "knn"]):
+    if (args.conventional_split is None and args.model in ["baseline", "baselinepp", "knn"]):
         args.conventional_split = True
     
-    # Preps datasets if they are imbalanced, 
-    # Also if specified, joins training and validation classes into one set, and performs a conventional split of images 
-    datasets = prep_datasets(datasets, args, conventional_split=args.conventional_split,
-                              from_train_only=args.conventional_split_from_train_only)
+    datasets = DATASETS[args.dataset](args.dataset_args)
+    datasets = prep_datasets(datasets, args,
+                             conventional_split=args.conventional_split,
+                             from_train_only=args.conventional_split_from_train_only)
     
     return datasets
 
@@ -418,27 +427,7 @@ def get_tasks(args):
     Returns task sampler classes for each stage of the experiment
     Sorts out task_args
     """
-    model_name = args["model"]
-    task_name = args["task"]
-    tasks = get_task_classes(task_name, model_name)
-    
-    # Update task_args
-    args.task_args = get_full_task_args(
-        tasks,
-        convert_to_nested_dict(args.task_args)
-    )
-    
-    # Update task_args 2nd time if _task_args in args
-    if "_task_args" in args:
-        args.task_args = get_full_task_args(
-            tasks,
-            convert_to_nested_dict(args._task_args),
-            default_args = args.task_args
-        )
-        del args._task_args
-    
-    args.task_args = toBunch(args.task_args)
-    
+    tasks = get_task_classes(args.task, args.model)
     return tasks
 
 
@@ -446,479 +435,76 @@ def get_backbone(args, device):
     """
     Returns the backbone model
     """
-    model_name = args["model"]
-    backbone_name = args["backbone"]
     
-    if backbone_name not in BACKBONES:
-        raise Exception("Backbone not found: {}".format(backbone_name))
+    if args.backbone not in BACKBONES:
+        raise Exception("Backbone not found: {}".format(args.backbone))
     
-    if model_name in ["relationnet", "relationdkt"]:
-        if backbone_name == "Conv4":
-            return backbones.Conv4NP(device, outdim=args.backbone_channel_dim)
-        if backbone_name == "Conv4S":
-            return backbones.Conv4SNP(device, outdim=args.backbone_channel_dim)
-        if backbone_name == "Conv6":
-            return backbones.Conv6NP(device, outdim=args.backbone_channel_dim)
+    if args.model in ["relationnet", "relationdkt"]:
+        if args.backbone == "Conv4":
+            return Conv4NP(device, outdim=args.backbone_channel_dim)
+        if args.backbone == "Conv6":
+            return Conv6NP(device, outdim=args.backbone_channel_dim)
     
-    if model_name in ["maml", "protomaml", "oml"]:
-        return BACKBONES[backbone_name](device, maml=True, outdim=args.backbone_channel_dim)
-    
-    if model_name in ["btaml"] and backbone_name in ["Conv4", "Conv6"]:
-        args.backbone_channel_dim = 32
-        return BACKBONES[backbone_name](device, maml=True, outdim=args.backbone_channel_dim)
+    if args.model in ["maml", "protomaml", "btaml"]:
+        return BACKBONES[args.backbone](device, maml=True, outdim=args.backbone_channel_dim)
         
-    return BACKBONES[backbone_name](device, outdim=args.backbone_channel_dim)
+    return BACKBONES[args.backbone](device, outdim=args.backbone_channel_dim)
 
 
 def get_model(backbone, tasks, datasets, stategy, args, device):
     """
     Returns FSL model and sorts out model_args
     """
-    model_name = args["model"]
-    task_name = args["task"]
-    print("Getting model: {}".format(model_name))
+    print("Getting model: {}".format(args.model))
     
-    if model_name not in MODELS:
-        raise Exception("Model {} does not exist".format(model_name))
-        
-    if model_name in ["baseline", "baselinepp", "maml", "dkt", "gpshot", "protomaml", "knn", "simpleshot",
+    if args.model not in MODELS:
+        raise Exception("Model {} does not exist".format(args.model))
+    
+    if 'seed' in args.model_args and args.model_args.seed == -1:
+        args.model_args.seed = args.seed
+    
+    if args.model in ["baseline", "baselinepp", "maml", "gpshot", "dkt", 
+                      "relationdkt", "protomaml", "knn", "simpleshot",
                      "bmaml", "bmaml_chaser", "btaml", "btaml_star"]:
         output_dims = dict()
         for s in ["train", "val", "test"]:
             output_dims[s] = tasks[s].get_output_dim(args.task_args[s], datasets[s])
-        args.model_args['output_dim'] = output_dims
-    
-    if model_name in ['simpleshot'] and args.model_args['disable_tqdm'] is None:
-        args.model_args['disable_tqdm'] = args['disable_tqdm']
+        args.model_args['output_dim'] = bunch.bunchify(output_dims)
         
-    if model_name in ['btaml'] and args.model_args['max_shot'] == -1:
+    if args.model in ['btaml']:
         if args.task in ['fsl']:
             maxshot = max([args.task_args[setname].num_supports for setname in ['train', 'test', 'val']])
         if args.task in ['fsl_imbalanced']:
             maxshot = max([args.task_args[setname].max_num_supports for setname in ['train', 'test', 'val']])
         args.model_args['max_shot'] = maxshot
     
-    # Update model_args
-    args.model_args = get_full_model_args(
-        model_name,
-        convert_to_nested_dict(args.model_args),
-    )
-    
-    # Update 2nd time if _model_args in args
-    if "_model_args" in args:
-        args.model_args = get_full_model_args(
-            model_name,
-            convert_to_nested_dict(args._model_args),
-            default_args= args.model_args
-        )
-        del args._model_args
-        
-    args.model_args = toBunch(args.model_args)
-    model = MODELS[model_name](backbone, stategy, args.model_args, device)
+    model = MODELS[args.model](backbone, stategy, args.model_args, device)
     model.setup_model()
-    
     return model.to(device)
-    
                   
-def sortout_ptracker_args(args):
-                  
-    # Update ptracker_args parameters
-    args.ptracker_args = get_full_ptracker_args(convert_to_nested_dict(args.ptracker_args))
-    
-    # Update ptracker_args parameters 2nd time if _dataset_args in args
-    if "_ptracker_args" in args:
-        args.ptracker_args = get_full_ptracker_args(
-            convert_to_nested_dict(args._ptracker_args),
-            default_args = args.ptracker_args
-        )
-        del args._ptracker_args
-        
-    return args
-                  
-                  
+       
 def get_strategy(args, device):
     print("Getting strategy: {}".format(args.strategy))
     
     if args.strategy not in STRATEGIES:
         raise Exception("Ups. Imbalance strategy {} does not exist!".format(args.strategy))
     
-    if args.strategy in ['ros_aug', 'ros_aug2']:
-        args.mono = (args.dataset in ['sss', 'sss_mini'])
-    
-    # Update parameters
-    args.strategy_args = get_full_strategy_args(
-        args.strategy,
-        convert_to_nested_dict(args.strategy_args)
-    )
-    
-    # Update parameters 2nd time if _strategy_args in args
-    if "_strategy_args" in args:
-        args.strategy_args = get_full_strategy_args(
-            args.strategy,
-            convert_to_nested_dict(args._strategy_args),
-            default_args = args.strategy_args
-        )
-        del args._strategy_args
-        
-    args.strategy_args = toBunch(args.strategy_args)
     strategy = STRATEGIES[args.strategy](args.strategy_args, device, args.seed)
-    
     return strategy
+
+def compress_args(args, parser=None):
+    compressed_args = copy.deepcopy(args)
     
-def expand_and_update_args(default_args, args, suppressed=True):
-    """
-    Updated default_args with hyperparameters in args
-    param default_args: should a dict(test=dict(), train=dict(), val=dict()) to update, containing full default arguments
-    """
+    if parser is None:
+        _,_,parser = get_args([], args)
     
-    # Place args in buckets such that they can be sorted out properly according to bucket rank
-    args_in_buckets = dict(test=dict(), train=dict(), val=dict(), eval=dict(), trval=dict(),_other=dict())
-    update_dict(args_in_buckets, args)
-    for param in list(args_in_buckets.keys()): # any hyperparams without an unassigned bucket go into '_other'
-        if param not in ["train", "test", "val", "eval", "trval", "_other"]:
-            args_in_buckets["_other"][param] = args_in_buckets[param]
-            del args_in_buckets[param]
+    is_three_phase = {a.dest:type(a) is ThreePhaseDict for a in parser._actions}
+    for k in compressed_args.keys():
+        if k in is_three_phase and is_three_phase[k]:
+            compressed_args[k] = compress_three_phase(compressed_args[k])
     
-    # Mapping between buckets and setnames eg <param> in args['eval'][<param>] goes to args['test'] and args['val'] 
-    buckets_to_setnames = {
-        "_other": ["train", "test", "val"], 
-        "trval": ["train", "val"],
-        "eval": ["test", "val"], 
-        "test": ["test"],
-        "val": ["val"],
-        "train": ["train"], 
-    }    
-    # List order defines bucket rank. Gives priority to the more specific bucket, eg eval < val
-    bucket_order = ['_other', 'trval', 'eval', 'test', 'val', 'train']
-    
-    # Goes through each bucket in turn, adding to default_args from args_in_buckets, while taking order into account
-    for bucket in bucket_order:
-        setnames = buckets_to_setnames[bucket]
-        
-        # For each hyperparam in a bucket, sort out any clashes based on bucket order
-        for hyperparam in args_in_buckets[bucket]:
-            
-            # Detect if the hyperparam is missing from the default_args
-            missing_from = [s for s in setnames if hyperparam not in default_args[s]]
-            if len(missing_from)!=0 and not suppressed:
-                print("#\t Hyperparameter args.{}.{} not found in default_args.{}".format(
-                    bucket, hyperparam, '|'.join(missing_from)))
-            
-            # Detect if the hyperparam is defined in another bucket of a lower order with overlapping setnames
-            bucket_clushes = []
-            for other_bucket in bucket_order:
-                if not suppressed and hyperparam in args_in_buckets[other_bucket] and \
-                   bucket_order.index(other_bucket) < bucket_order.index(bucket) and \
-                   not set(buckets_to_setnames[bucket]).isdisjoint(set(buckets_to_setnames[other_bucket])):
-                    bucket_clushes.append(other_bucket)
-                    
-            if len(bucket_clushes) > 0:
-                other_bucket = bucket_clushes[-1]  # highest order bucket
-                if not suppressed:
-                    print("#\t Overwriting args{}.{} = {} \t with args{}.{} = {} ".format(
-                       '' if other_bucket == '_other' else ".{}".format(other_bucket), 
-                        hyperparam, args_in_buckets[other_bucket][hyperparam], 
-                        '' if bucket == '_other' else ".{}".format(bucket),
-                        hyperparam, args_in_buckets[bucket][hyperparam]))
-                
-            # update parameter
-            for s in setnames:
-                if hyperparam in default_args[s]:
-                    default_args[s][hyperparam] = args_in_buckets[bucket][hyperparam]
-                elif not suppressed:
-                    print("#\t Ignoring hyperparameter args.{}.{}".format(s, hyperparam))
-    
-    return default_args
-
-
-def convert_to_nested_dict(params, upto_level=None):
-    """
-    Splits keys containing '.', and converts into a nested dict
-    """
-    combined = dict()
-    for key, value in list(params.items()):
-        dict_item = nested_item(key.split("."), value, upto_level)
-        combined = update_dict(combined, dict_item)
-    return combined
-
-def nested_value(v, upto_level=None):
-    if isinstance(v, collections.abc.Mapping):
-        return convert_to_nested_dict(v, upto_level)
-    else:
-        return v
-
-def nested_item(keylist, value, upto_level=None):
-    """
-    Recursive method for converting into a nested dict
-    Splits keys containing '.', and converts into a nested dict
-    """
-#     print(keylist, value)
-#     if value == ['accuracy', 'loss', 'per_cls_stats']:
-#         import pdb; pdb.set_trace();
-
-    if upto_level is None: upto_level = len(keylist)
-    
-    if len(keylist) == 0:
-        return nested_value(value)
-    
-    if len(keylist) == 1 or upto_level <= 0:
-        key = '.'.join(keylist)
-        base = dict()
-        base[key] = nested_value(value)
-        return base
-    
-    else:
-        key = keylist[0]
-        value = nested_item(keylist[1:], value, upto_level-1)
-        base = dict()
-        base[key] = nested_value(value)
-        return base
-
-
-def update_dict(base, to_update):
-    """
-    Updates a nested dict
-    """
-    if base is None:
-        return to_update
-    
-    for k, v in to_update.items():
-        if isinstance(v, collections.abc.Mapping):
-            base[k] = update_dict(base.get(k, {}), v)
-        else:
-            base[k] = v
-    return base
-
-def get_default_parser_args(parser):
-    """
-    Returns default args of a given parser
-    """
-    args = parser.parse_args([])
-    args_vars = vars(args)
-    return args_vars
-
-
-# def get_full_strategy_args(strategy, args, default_args=None):
-#     """
-#     Gets default ptracker args and updates with given ptracker args
-#     """
-#     if strategy is None:
-#         return dict()
-    
-#     if default_args is None:
-#         _default_args = get_default_parser_args(STRATEGIES[strategy].get_parser())
-#         default_args = dict()
-#         default_args["train"] = copy.copy(_default_args)
-#         default_args["val"] = copy.copy(_default_args)
-#         default_args["test"] = copy.copy(_default_args)
-#     return expand_and_update_args(default_args, args)
-
-def get_full_strategy_args(strategy, args, default_args=None, suppressed=True):
-    """
-    Gets default model args and updates with given model args
-    Note: model_args do not contain args for separate stages, this is left for model implementation
-    """
-    if strategy is None:
-        return dict()
-
-    if default_args is None:
-        default_args = get_default_parser_args(STRATEGIES[strategy].get_parser(argparse.ArgumentParser()))
-    
-    # Update default_args
-    for key, value in args.items():
-        if key in default_args:
-            default_args[key] = value # updating value
-        elif not suppressed:
-            print("#\t Key not found in the model_args {}".format(key))
-    
-    return default_args
-
-def get_full_ptracker_args(args, default_args=None):
-    """
-    Gets default ptracker args and updates with given ptracker args
-    """
-    if default_args is None:
-        _default_args = get_default_parser_args(PerformanceTracker.get_parser())
-        default_args = dict()
-        default_args["train"] = copy.copy(_default_args)
-        default_args["val"] = copy.copy(_default_args)
-        default_args["test"] = copy.copy(_default_args)
-        
-    return expand_and_update_args(default_args, args)
-
-def get_full_dataset_args(dataset, args, default_args=None):
-    """
-    Gets default dataset args and updates with given dataset args
-    """
-    if default_args is None:
-        _default_args = get_default_parser_args(get_dataset_parser(dataset))
-        default_args = dict()
-        default_args["train"] = copy.copy(_default_args)
-        default_args["val"] = copy.copy(_default_args)
-        default_args["test"] = copy.copy(_default_args)
-    return expand_and_update_args(default_args, args)
-
-
-def get_full_task_args(tasks, args, default_args=None):
-    """
-    Gets default task args and updates with given task args
-    """
-    if default_args is None:
-        default_args = dict()
-        default_args["train"] = get_default_parser_args(tasks["train"].get_parser(argparse.ArgumentParser()))
-        default_args["val"] = get_default_parser_args(tasks["val"].get_parser(argparse.ArgumentParser()))
-        default_args["test"] = get_default_parser_args(tasks["test"].get_parser(argparse.ArgumentParser()))
-    return expand_and_update_args(default_args, args)
-
-
-def get_full_model_args(model, args, default_args=None, suppressed=True):
-    """
-    Gets default model args and updates with given model args
-    Note: model_args do not contain args for separate stages, this is left for model implementation
-    """
-    if default_args is None:
-        default_args = get_default_parser_args(MODELS[model].get_parser(argparse.ArgumentParser()))
-    
-    # Update default_args
-    for key, value in args.items():
-        if key in default_args:
-            default_args[key] = value # updating value
-        elif not suppressed:
-            print("#\t Key not found in the model_args {}".format(key))
-    
-    return default_args
-
-def compress(args_dict):
-    """
-    Compresses an args_dict into a more compact form of dictionary
-    The args_dict should contain 'train', 'test', 'val' keys 
-    Returns 'train.<param>' type of notation
-    """
-    
-    similarity_args = defaultdict(lambda : list())
-    
-    setnames = ["train", "test", "val"]
-    if not all([(s in args_dict) for s in setnames]):
-        return args_dict
-    
-    for i, s in enumerate(setnames):
-        args = args_dict[s]
-        for k,v in args.items():
-            if type(v) is list:
-                v = tuple(v)
-            similarity_args[(k,v)].append(s)
-    
-    compressed_args = dict()
-    for k_v_pair, setnames in similarity_args.items():
-        k, v = k_v_pair
-        if len(setnames) == 2 and "test" in setnames and "val" in setnames:
-            s = "eval"
-            if s not in compressed_args: compressed_args[s] = dict()
-            compressed_args[s][k] = v
-            
-        elif len(setnames) == 2 and "train" in setnames and "val" in setnames:
-            s = "trval"
-            if s not in compressed_args: compressed_args[s] = dict()
-            compressed_args[s][k] = v
-        
-        elif len(setnames) == 3:
-            compressed_args[k] = v
-            
-        else:
-            for s in setnames:
-                if s not in compressed_args: compressed_args[s] = dict()
-                compressed_args[s][k] = v
-     
     return compressed_args
-
-
-def compress_and_print(args):
-    """
-    Prints args in a more compact form
-    """
-    temp_args = copy.deepcopy(args)
-    temp_args = toDict(temp_args)
-    temp_args['model_args'] = compress(temp_args['model_args'])
-    temp_args['dataset_args'] = compress(temp_args['dataset_args'])
-    temp_args['task_args'] = compress(temp_args['task_args'])
-    temp_args['ptracker_args'] = compress(temp_args['ptracker_args'])
-    temp_args['strategy_args'] = compress(temp_args['strategy_args'])
     
-    print(" ---------- FULL ARGS (COMPACT) ---------")
-    pprint.pprint(temp_args, indent=2)
-    print(" ----------------------------------------")
-
-    
-    
-def str2bool(v):
-    """
-    Acceptable boolean type passed through stdin
-    """
-    if isinstance(v, bool):
-        return v
-    if v.lower() in ('yes', 'true', 't', 'y', '1', 'True'):
-        return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0', 'False'):
-        return False
-    else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
-
-        
-"""
-str2bool_args is a shortcut args list for str2bool type 
-"""
-str2bool_args = dict( type=str2bool, nargs='?', const=True )        
-
-
-class Bunch(object):
-    """
-    Bunch object made for convenience allows to be accessed like as dictionary and an object 
-    """
-    
-    def __init__(self, adict):
-        super().__init__()
-        update_dict(self.__dict__, adict)
-    def update_dict(self, adict):
-        update_dict(self.__dict__, adict)
-    def __contains__(self, arg):
-        return arg in self.__dict__
-    def __repr__(self):
-        return json.dumps(self.__dict__, indent =2, default= lambda o: o.__dict__)
-    def __getitem__(self, key):
-         return self.__dict__[key]
-    def __setitem__(self, key, value):
-         self.__dict__[key] = value
-        
-        
-def toBunch(d, nested_only=False):
-    """
-    Converts a nested dictionary to a nested Bunch object
-    param nested_only: only converts the nested dict, leaves the outer dict as dict
-    """
-    if isinstance(d, Bunch): return d
-    new_d = {}
-    for key, value in list(d.items()):
-        if isinstance(value, collections.abc.Mapping):
-            new_d[key] = toBunch(value)
-        else:
-            new_d[key] = value
-    new_d = new_d if nested_only else Bunch(new_d)
-    return new_d
-
-
-def toDict(bunch):
-    """
-    Converts a nested bunch to a nested dict
-    """
-    new_d = {}
-    adict = bunch.__dict__ if isinstance(bunch, Bunch) else bunch
-    for key, value in list(adict.items()):
-        if isinstance(value, collections.abc.Mapping) or isinstance(value, Bunch):
-            new_d[key] = toDict(value)
-        else:
-            new_d[key] = value
-    return new_d
-
 
 def torch_summarize(model, show_weights=True, show_parameters=True):
     """Summarizes torch model by showing trainable parameters and weights."""
@@ -982,89 +568,3 @@ def find(pattern, path):
             if fnmatch.fnmatch(name, pattern):
                 result.append(os.path.join(root, name))
     return result
-
-
-class PrintHelpAction(argparse.Action):
-    
-    def __call__(self, parser, namespace, values, option_string=None):
-        arg_vars = vars(namespace)
-        model =  arg_vars["model"]
-        task = arg_vars["task"]
-        strategy =arg_vars["strategy"]
-        dataset = arg_vars["dataset"]
-        
-        print_model = (option_string == '--help_all') | (option_string == '--help_model')
-        print_dataset = (option_string == '--help_all') | (option_string == '--help_dataset')
-        print_strategy = (option_string == '--help_all') | (option_string == '--help_strategy')
-        print_task = (option_string == '--help_all') | (option_string == '--help_task')
-        print_ptracker = (option_string == '--help_all') | (option_string == '--help_ptracker')
-        
-        if (option_string == '--help_all'):
-            parser.print_help()
-        
-        print("\n")
-        print('',"-"*87)
-        print("\t\t\t\tJSON parsable ARG OPTIONS")
-        print('',"-"*87)
-        print('',"-"*87)
-        print("|","Note: ", "\t\t\t\t\t\t\t\t\t\t|")
-        print("|","\t'3-phase'", "args means that three separate copies of args are generated - one for", "|")
-        print("|","\t", "each of the three different phases of the experiment: train, val, test).", "\t|")
-        print("|","\t", "Use the syntactic sugar for easy differentiation between phases:", "\t\t|")
-        print("|","\t\t", '\'{"{train,val,test,trval,eval}.[ARG1]":[VALUE1], ... }\'', "\t\t|")
-        print('',"-"*87)
-        print("\n")
-        
-        usage_args = '\'{"[ARG1]":[VALUE1], ... }\''
-        
-        if print_ptracker:
-            print("PTRACKER_ARGS (3-phase):")
-            helpstr = PerformanceTracker.get_parser(
-                parser=argparse.ArgumentParser(usage='%(prog)s --ptracker_args {}'.format(usage_args),
-                                               formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                               add_help=False)).format_help()
-            print('\t' + helpstr.replace('\n', '\n\t'))
-            print("\n")
-            
-        if print_model:
-            print("MODEL_ARGS for '{}' (NOT 3-phase):".format(model))
-            helpstr = MODELS[model].get_parser(
-                parser=argparse.ArgumentParser(usage='%(prog)s --model {} --model_args {}'.format(model, usage_args),
-                                               formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                               add_help=False)).format_help()
-            print('\t' + helpstr.replace('\n', '\n\t'))
-            print("\n")
-        
-        if print_dataset:
-            print("DATASET_ARGS for '{}' (3-phase)".format(dataset))
-            helpstr = get_dataset_parser(dataset, 
-                               parser=argparse.ArgumentParser(
-                                   usage='%(prog)s --dataset {} --dataset_args {}'.format(dataset, usage_args),
-                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                   add_help=False)).format_help()
-            print('\t' + helpstr.replace('\n', '\n\t'))
-            print("\n")
-        
-        if print_task:
-            print("TASK_ARGS for '{}' (3-phase)".format(task))
-            helpstr = TASKS[task].get_parser(parser=argparse.ArgumentParser(
-                usage='%(prog)s --task {} --task_args {}'.format(task, usage_args),
-                formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                add_help=False)).format_help()
-            print('\t' + helpstr.replace('\n', '\n\t'))
-            print("\n")
-        
-        if print_strategy:
-            print("STRATEGY_ARGS for '{}' (NOT 3-phase)".format(strategy))
-            if strategy is not None:
-                helpstr = STRATEGIES[strategy].get_parser(parser=argparse.ArgumentParser(
-                    usage='%(prog)s --strategy {} --strategy_args {}'.format(strategy, usage_args), 
-                    formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                    add_help=False)).format_help()
-                print('\t' + helpstr.replace('\n', '\n\t'))
-            else:
-                print("\tStrategy unspecified (no strategy will be applied).")
-                print("\tSelect strategy OPTIONS: {}".format(list(STRATEGIES.keys())))
-            print("\n")
-        
-        sys.exit(0)

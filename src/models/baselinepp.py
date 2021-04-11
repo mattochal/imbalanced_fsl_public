@@ -1,4 +1,4 @@
-import models.backbones as backbones
+from backbones.layers import distLinear
 from models.baseline import Baseline
 
 class BaselinePP(Baseline):
@@ -10,11 +10,11 @@ class BaselinePP(Baseline):
         """
         Setups a normalised linear classifier
         """
-        return backbones.distLinear(self.backbone.final_feat_dim, output_dim).to(self.device)
+        return distLinear(self.backbone.final_feat_dim, output_dim).to(self.device)
     
     
     def setup_classifier(self, output_dim):
-        return backbones.distLinear(self.backbone.final_feat_dim, output_dim).to(self.device)
+        return distLinear(self.backbone.final_feat_dim, output_dim).to(self.device)
 
     def reset_test_classifier(self):
         self.test_classifier = self.setup_classifier(self.output_dim[self.mode])

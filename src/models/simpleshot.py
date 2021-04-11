@@ -55,7 +55,8 @@ def unfreeze_model(model):
 class SimpleShot(ModelTemplate):
     
     @staticmethod
-    def get_parser(parser = argparse.ArgumentParser(description='Baseline/Baseline++')):
+    def get_parser(parser=None):
+        if parser is None: parser = argparse.ArgumentParser(description='SimpleShot')
         """
         returns a parser for the given model. Can also return a subparser
         """
@@ -68,7 +69,6 @@ class SimpleShot(ModelTemplate):
                             help='Approximates the train mean using only a fraction of the dataset')
         parser.add_argument('--output_dim', type=dict, default={"train":-1, "val":-1, "test":-1},
                            help='output dimention for the classifer, if -1 set in code')
-        parser.add_argument('--disable_tqdm', default=None, help="If None, set in code.")
         return parser
     
     def __init__(self, backbone, strategy, args, device):
@@ -126,7 +126,7 @@ class SimpleShot(ModelTemplate):
         self.strategy.reset()
         self.proto_memory = dict()
         
-    def set_train_mean(self, dataset, disable_tqdm=False):
+    def set_train_mean(self, dataset, istqdm=False):
         if not self.update_train_mean: return 
         self.eval()
         
@@ -135,10 +135,10 @@ class SimpleShot(ModelTemplate):
             length = int(length * 0.05)
         
         with torch.no_grad():
-            pbar = tqdm.tqdm(initial=0, total=length, disable=self.args.disable_tqdm)
+            pbar = tqdm.tqdm(initial=0, total=length, disable=(not istqdm))
             pbar.set_description("Calculating train mean")
             
-            if disable_tqdm:
+            if not istqdm:
                 print("Calculating train mean")
 
             batch_size = 64

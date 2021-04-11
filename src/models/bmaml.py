@@ -107,7 +107,7 @@ class BayesianMAML(ModelTemplate):
         self.batch_count = 0
         self.batch_losses = []
         self.fast_parameters = []
-        assert self.output_dim.train == self.output_dim.test, 'maml training output dim must mimic the testing scenario'
+        assert self.output_dim.train == self.output_dim.test, 'training output dim must mimic the testing scenario'
     
     def setup_model(self):
         self.loss_fn = nn.CrossEntropyLoss()

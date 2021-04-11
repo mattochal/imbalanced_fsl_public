@@ -1,6 +1,7 @@
 from models.protonet import ProtoNet
+from backbones.layers import init_layer
+
 import torch.nn as nn
-import models.backbones as backbones 
 import torch
 import torch.nn.functional as F
 import pprint
@@ -13,7 +14,8 @@ import argparse
 class RelationNet(ProtoNet):
     
     @staticmethod
-    def get_parser(parser = argparse.ArgumentParser(description='RelationNet')):
+    def get_parser(parser=None):
+        if parser is None: parser = argparse.ArgumentParser(description='RelationNet')
         parser = ProtoNet.get_parser(parser)
         parser.add_argument('--loss_type', type=str, choices=['mse', 'softmax'], default='mse')
         return parser
@@ -111,7 +113,7 @@ class RelationConvBlock(nn.Module):
         self.parametrized_layers = [self.C, self.BN, self.relu, self.pool]
 
         for layer in self.parametrized_layers:
-            backbones.init_layer(layer)
+            init_layer(layer)
 
         self.trunk = nn.Sequential(*self.parametrized_layers)
 

@@ -29,11 +29,11 @@ class Baseline(ModelTemplate):
         self.output_dim = args.output_dim
         self.finetune_iter = args.finetune_iter
         self.finetune_batch_size = args.finetune_batch_size
-        self.reset_test_classifier_between_subtasks = True
        
     def setup_model(self):
         self.train_classifier = self.setup_classifier(self.output_dim.train)
         self.test_classifier = self.setup_classifier(self.output_dim.test)
+        self.reset_test_classifier()
         self.loss_fn = nn.CrossEntropyLoss().to(self.device)
         
         all_params = list(self.backbone.parameters()) + list(self.train_classifier.parameters())
@@ -101,7 +101,6 @@ class Baseline(ModelTemplate):
         Prep network for FSL task
         """
         freeze_model(self.backbone)
-        self.reset_test_classifier()
         self.strategy.reset()
         
     def net_train(self, support_set):
@@ -153,6 +152,7 @@ class Baseline(ModelTemplate):
         
     def net_post(self):
         unfreeze_model(self.backbone)
+        self.reset_test_classifier()
         
     def setup_classifier(self, output_dim):
         """
