@@ -1,7 +1,7 @@
 # Imbalanced Few-Shot Learning Framework in Pytorch
 This repository contains code for:
  * "Few-Shot Learning with Class Imbalance" [(arXiv)](http://arxiv.org/abs/2101.02523).
- * "How sensitive are Meta-Learners to Dataset Imbalance?" [(ICLR ``Learning to Learn`` Workshop 2021)](https://openreview.net/forum?id=-vafHc91wO8&referrer=%5BAuthor%20Console%5D(%2Fgroup%3Fid%3DICLR.cc%2F2021%2FWorkshop%2FLearning_to_Learn%2FAuthors%23your-submissions)) [(arXiv[TODO])](http://arxiv.org/).
+ * "How sensitive are Meta-Learners to Dataset Imbalance?" [(ICLR Workshop 2021)](https://openreview.net/forum?id=-vafHc91wO8&referrer=%5BAuthor%20Console%5D(%2Fgroup%3Fid%3DICLR.cc%2F2021%2FWorkshop%2FLearning_to_Learn%2FAuthors%23your-submissions)) [(arXiv[TODO])](http://arxiv.org/).
 
 
 This respository is also compatible with my demo app for Few-Shot Learning [(available here)](http://github.com/mattochal/demo_fsl_public).
@@ -96,7 +96,7 @@ To run a specific experiment setting from a configuration file:
 ```
 python src/main.py --args_file <CONFIGPATH> --gpu <GPU>
 ```
-
+<!--
 Arguments from the ```CONFIGPATH``` can be overwriten by arguments passed through the command line.
 
 Run ```python src/main.py --help``` for general help
@@ -109,6 +109,7 @@ python src/main.py  --task <TASK> --help_task
 python src/main.py  --strategy <STRATEGY> --help_stategy
 python src/main.py  --model <MODEL>   --task <TASK>  --task <STRATEGY>   --help_all```
 ```
+--!>
 
 ____
 
