@@ -12,7 +12,7 @@ This respository is also compatible with my demo app for Few-Shot Learning [(ava
 ## UPDATES
 \[11 April 2021\] - Major update including corrections to BTAML, ProtoMAML, experiments on long-tail distribution, task-by-task demo app compatibility. 
 
-
+## Running Repository
 ### Dependecies
 
 * numpy
