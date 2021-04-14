@@ -1,4 +1,4 @@
-# Imbalanced Few-Shot Learning Framework in Pytorch
+# Few-Shot Learning with Class Imbalance
 This repository contains code for:
  * "Few-Shot Learning with Class Imbalance" [(arXiv)](http://arxiv.org/abs/2101.02523).
  * "How sensitive are Meta-Learners to Dataset Imbalance?" [(ICLR2021 Workshop)](https://openreview.net/forum?id=-vafHc91wO8&referrer=%5BAuthor%20Console%5D(%2Fgroup%3Fid%3DICLR.cc%2F2021%2FWorkshop%2FLearning_to_Learn%2FAuthors%23your-submissions)) [(arXiv)](http://arxiv.org/abs/2104.05344).
