@@ -3,11 +3,11 @@ This repository contains code for:
  * "Few-Shot Learning with Class Imbalance" [(arXiv)](http://arxiv.org/abs/2101.02523).
  * "How sensitive are Meta-Learners to Dataset Imbalance?" [(ICLR2021 Workshop)](https://openreview.net/forum?id=-vafHc91wO8&referrer=%5BAuthor%20Console%5D(%2Fgroup%3Fid%3DICLR.cc%2F2021%2FWorkshop%2FLearning_to_Learn%2FAuthors%23your-submissions)) [(arXiv)](http://arxiv.org/abs/2104.05344).
 
+![Task Imbalance](https://github.com/mattochal/imbalanced_fsl_public/blob/master/imbalance_diagram.png?raw=true)
 
 This respository is also compatible with my demo app for Few-Shot Learning [(available here)](http://github.com/mattochal/demo_fsl_public).
 
 <!-- ![GUI Screenshot](https://github.com/mattochal/demo_fsl_dev/blob/master/demo.gif?raw=true) -->
-![Task Imbalance](https://github.com/mattochal/imbalanced_fsl_public/blob/master/imbalance_diagram.png?raw=true)
 
 ## UPDATES
 \[11 April 2021\] - Major update including corrections to BTAML, ProtoMAML, experiments on long-tail distribution, task-by-task demo app compatibility. 
