@@ -7,7 +7,7 @@ This repository contains code for:
 This respository is also compatible with my demo app for Few-Shot Learning [(available here)](http://github.com/mattochal/demo_fsl_public).
 
 <!-- ![GUI Screenshot](https://github.com/mattochal/demo_fsl_dev/blob/master/demo.gif?raw=true) -->
-
+![Task Imbalance](https://github.com/mattochal/imbalanced_fsl_public/blob/master/imbalance_diagram.png?raw=true)
 
 ## UPDATES
 \[11 April 2021\] - Major update including corrections to BTAML, ProtoMAML, experiments on long-tail distribution, task-by-task demo app compatibility. 
