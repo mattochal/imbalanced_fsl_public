@@ -58,7 +58,7 @@ create_cache_from_folders.py `<DATASET>`
 ```
 
 
-### MiniImageNet
+## MiniImageNet
 
 MiniImageNet can be downloaded and created using: https://github.com/yaoyao-liu/mini-imagenet-tools 
 
@@ -69,7 +69,7 @@ mini-cache-test.pkl
 mini-cache-val.pkl
 ```
 
-### CUB-200 2011
+## CUB-200 2011
 
 [Download from official source](http://www.vision.caltech.edu/visipedia/CUB-200-2011.html)
 
