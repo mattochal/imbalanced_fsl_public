@@ -53,7 +53,7 @@ The images should be contained in class subfolders, and the class subfolders con
          |   ...
          ...
 ```
-where `<DATASET>` is `mini` or `cub`. Classes and images can have arbitary names. Accepted extentions: '.jpg', '.jpeg', '.gif', '.png', '.JPEG' 
+where `<DATASET>` is `mini` or `cub` or `custom`. Classes and images can have arbitary names. Accepted extentions: '.jpg', '.jpeg', '.gif', '.png', '.JPEG' 
 
 To create dataset from the subdirectories run:
 ```
