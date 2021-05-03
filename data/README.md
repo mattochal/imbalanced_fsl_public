@@ -1,5 +1,10 @@
 # Dataset Instructions
 
+Our framework supports Mini-ImageNet, CUB and custom datasets.
+
+**Dataset files can be *created from a class subdirectory structure* using ```create_cache_from_folders.py``` or write your own method to create the pickle files with the *Dataset Format* decribed below.** 
+
+## Dataset Format
 Our framework reads pickle (```.pkl```) dataset files with the following structure:
 
 ```
@@ -10,9 +15,7 @@ Our framework reads pickle (```.pkl```) dataset files with the following structu
 ```
 where `n` is the total number of images in dataset.
 
-You can create the dataset files from a subdirectory structure using ```create_cache_from_folders.py``` (or write your own method to create the pickle files). 
-
-## Create from class subdirectory structure
+## Create from a class subdirectory structure
 The images should be contained in class subfolders, and the class subfolders contained in: ```train/```, ```val/``` and ```test/``` folders, i.e. the following directory structure should be located inside ```./data/```:
 ```
 .<DATASET>/
