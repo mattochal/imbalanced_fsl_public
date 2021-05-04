@@ -131,3 +131,9 @@ https://github.com/katerakelly/pytorch-maml
 https://github.com/dragen1860/MAML-Pytorch
 
 https://github.com/cnguyen10/few_shot_meta_learning
+
+____
+
+### Attribution
+
+We want to thank Eleni Triantafillou, Hae Beom Lee, Hayeon Lee, and the members of the Bayesian and Neural Systems group at the University of Edinburgh for valuable comments, suggestions, and discussions offered at various stages of this work. This work was supported by the EPSRC Centre for Doctoral Training in Robotics and Autonomous Systems, funded by the UK Engineering and Physical Sciences Research Council (Grant No. EP/S515061/1) and SeeByte Ltd, Edinburgh, UK.
